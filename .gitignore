@@ -1,0 +1,98 @@
+# Unity generated directories
+**/[Ll]ibrary/
+**/[Tt]emp/
+**/[Oo]bj/
+**/[Ll]ogs/
+**/[Uu]ser[Ss]ettings/
+**/[Mm]emoryCaptures/
+**/[Rr]ecordings/
+
+# Unity build output
+/Builds/
+**/[Bb]uild/
+**/[Bb]uilds/
+**/[Bb]uildOutput/
+**/[Bb]urstDebugInformation_DoNotShip/
+**/[Ii]l2[Cc]ppBuildCache/
+
+# Unity generated files
+*.csproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+sysinfo.txt
+crashlytics-build.properties
+
+# Unity packages and generated exports
+*.unitypackage
+*.apk
+*.aab
+*.app
+*.exe
+
+# Python environments and caches
+**/.venv/
+**/venv/
+**/env/
+**/__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE and editor settings
+.idea/
+.vs/
+.vscode/
+*.swp
+*.swo
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local match data and captured media
+/demo/
+*.dem
+*.mp4
+*.mov
+*.m4v
+*.avi
+*.webm
+
+# Machine-learning weights and runtime engines
+*.pt
+*.pth
+*.onnx
+*.engine
+*.weights
+
+# Temporary and local diagnostic output
+*.log
+*.tmp
+*.bak
+*.cache
