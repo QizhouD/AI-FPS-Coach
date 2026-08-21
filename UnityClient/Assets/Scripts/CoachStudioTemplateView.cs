@@ -45,6 +45,8 @@ namespace FpsAiCoach
         private int lastImportRequestFrame = -1;
         private bool isVideoReady;
 
+        public event Action<string> VideoPathLoaded;
+
         public void Configure(Transform core, Transform beacon)
         {
             scanningCore = core;
@@ -218,6 +220,7 @@ namespace FpsAiCoach
             isVideoReady = false;
             videoPlayer.Stop();
             videoPlayer.url = new Uri(path).AbsoluteUri;
+            VideoPathLoaded?.Invoke(path);
             SetPlaybackAvailable(false);
             SetVideoStatus("LOADING VIDEO");
             SetTimeStatus("00:00 // 00:00");

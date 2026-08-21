@@ -54,6 +54,7 @@ namespace FpsAiCoach.Editor
 
             var view = root.AddComponent<CoachStudioTemplateView>();
             root.AddComponent<WorldButtonRayInteractor>();
+            root.AddComponent<VisionInferenceOverlay>();
             view.Configure(scanningCore, statusBeacon);
 
             var prefabPath = PrefabFolder + "/FPSCoachStudioTemplate.prefab";

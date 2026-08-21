@@ -94,6 +94,39 @@ feedback loop.
 - Aim, positioning, decision, and action recommendations
 - No persistent frame or demo storage
 
+## Vision Inference MVP
+
+The backend now exposes a local vision contract for enemy heads, the actual
+crosshair, and the recommended aim point:
+
+~~~text
+POST /api/v1/vision/frame
+POST /api/v1/vision/video
+GET  /api/v1/vision/jobs/{job_id}
+~~~
+
+Configure model paths before starting the backend:
+
+~~~powershell
+$env:FPS_VISION_ENEMY_MODEL_PATH = "D:\models\cs2-yolov10s.pt"
+$env:FPS_VISION_CROSSHAIR_MODEL_PATH = "D:\models\crosshair\weights\best.pt"
+$env:FPS_VISION_CROSSHAIR_BASELINE = "true"
+$env:FPS_VISION_MEDIA_ROOT = "D:\desktop\DQZ\AI-Coach-For-FPS\media"
+$env:FPS_VISION_DEVICE = "cpu"
+.\Backend\run.ps1
+~~~
+
+The Unity client samples its VideoPlayer RenderTexture and draws the
+inference overlay on the video surface. Without model paths, the API remains
+available, returns empty enemy detections, and uses the screen-center baseline
+for the actual crosshair.
+Training, frame sampling, and PyTorch/ONNX comparison helpers are under
+Backend/tools. See `Backend/vision/README.md` for the full crosshair dataset
+workflow.
+
+For the complete Chinese execution checklist, see
+`VISION_NEXT_STEPS_ZH.md`.
+
 ## Next Analysis Milestones
 
 1. Extract economy, utility, trade kills, and clutch state per round.

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 import os
 import tempfile
+from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +12,8 @@ from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from .demo_analyzer import analyze_cs2_demo, sample_analysis
+from .vision.schemas import VisionFrameResponse, VisionJobResponse, VisionVideoRequest
+from .vision.worker import VisionInferenceEngine, VisionJobManager
 
 
 app = FastAPI(
@@ -23,6 +26,31 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+
+def _optional_path(name: str) -> str | None:
+    value = os.getenv(name, "").strip()
+    return value or None
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+vision_engine = VisionInferenceEngine(
+    enemy_model_path=_optional_path("FPS_VISION_ENEMY_MODEL_PATH"),
+    crosshair_model_path=_optional_path("FPS_VISION_CROSSHAIR_MODEL_PATH"),
+    crosshair_baseline=_env_bool("FPS_VISION_CROSSHAIR_BASELINE", True),
+    confidence=float(os.getenv("FPS_VISION_CONFIDENCE", "0.25")),
+    device=os.getenv("FPS_VISION_DEVICE", "cpu"),
+)
+vision_jobs = VisionJobManager(
+    vision_engine,
+    os.getenv("FPS_VISION_MEDIA_ROOT", str(Path.cwd() / "media")),
 )
 
 
@@ -163,6 +191,58 @@ async def analyze_frame(
         ),
         tip=tip,
     )
+
+
+@app.post("/api/v1/vision/frame", response_model=VisionFrameResponse)
+async def analyze_vision_frame(
+    frame: UploadFile = File(...),
+    timestamp: float = Form(0.0),
+    frame_index: int = Form(0),
+    session_id: str = Form("anonymous"),
+) -> VisionFrameResponse:
+    payload = await frame.read()
+    try:
+        import cv2
+        import numpy as np
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Vision dependencies are not installed: opencv-python and numpy.",
+        ) from exc
+
+    image = cv2.imdecode(np.frombuffer(payload, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise HTTPException(status_code=400, detail="Unable to decode the image frame.")
+    return vision_engine.analyze_image(
+        image,
+        timestamp=timestamp,
+        frame_index=frame_index,
+        session_id=session_id,
+    )
+
+
+@app.post("/api/v1/vision/video", response_model=VisionJobResponse)
+def submit_vision_video(request: VisionVideoRequest) -> VisionJobResponse:
+    try:
+        job_id = vision_jobs.submit(
+            request.video_path,
+            request.session_id,
+            request.sample_rate,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    result = vision_jobs.get(job_id)
+    if result is None:
+        raise HTTPException(status_code=500, detail="Unable to create vision job.")
+    return result
+
+
+@app.get("/api/v1/vision/jobs/{job_id}", response_model=VisionJobResponse)
+def get_vision_job(job_id: str) -> VisionJobResponse:
+    result = vision_jobs.get(job_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Vision job not found.")
+    return result
 
 
 @app.get("/api/v1/analyze/demo/sample", response_model=DemoAnalysisResponse)
