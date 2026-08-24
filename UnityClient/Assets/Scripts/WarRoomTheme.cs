@@ -231,13 +231,25 @@ namespace FpsAiCoach
             public float rowIndicatorWidth = 0.05f;
             public float headerHeight = 0.42f;
 
+            [Header("Library footer (demo import actions)")]
+            [Tooltip("Two side-by-side action buttons below the row stack.")]
+            public float footerButtonHeight = 0.4f;
+
+            [Tooltip("Share of the content width taken by the primary IMPORT DEMO button.")]
+            [Range(0.5f, 0.85f)] public float footerPrimaryShare = 0.66f;
+
+            public float footerButtonGap = 0.06f;
+            public float footerStatusHeight = 0.26f;
+            public float footerTopGap = 0.08f;
+
             [Header("Insight metrics")]
-            public float metricRowHeight = 0.62f;
+            [Tooltip("Tightened from 0.62 so three insight cards fit under three metric bars.")]
+            public float metricRowHeight = 0.54f;
             public float metricBarHeight = 0.075f;
             [Tooltip("Kept equal to the canvas content width so bars align flush with the labels.")]
             public float metricBarWidth = 2.26f;
-            public float cardHeight = 0.86f;
-            public float cardGap = 0.1f;
+            public float cardHeight = 0.62f;
+            public float cardGap = 0.08f;
             public float cardIndicatorWidth = 0.055f;
 
             public Vector2 CanvasSize => new Vector2(
@@ -301,7 +313,17 @@ namespace FpsAiCoach
             public float metricValue = 0.32f;
             public float cardTitle = 0.155f;
             public float cardBody = 0.125f;
+
+            [Header("Auto-size floors for service-supplied copy")]
+            [Tooltip("Insight titles arrive as full sentences, so they shrink toward this to stay in the card.")]
+            public float cardTitleFloor = 0.095f;
+
+            public float cardBodyFloor = 0.088f;
             public float buttonLabel = 0.19f;
+
+            [Tooltip("Rail footer actions are narrower than the deck, so their labels step down a size.")]
+            public float footerButtonLabel = 0.12f;
+
             public float screenStatus = 0.16f;
             public float timecode = 0.16f;
 
@@ -400,22 +422,35 @@ namespace FpsAiCoach
             public string insightsTitle = "COACH INSIGHTS";
             public string screenTitle = "VIDEO REVIEW";
 
+            /// <summary>
+            /// Four rows, not five: the library rail also carries the import footer, and five rows
+            /// filled the canvas edge to edge. Row 0 is overwritten by each analyzed report, so it is
+            /// authored as the most recent match.
+            /// </summary>
             public MatchEntry[] matches =
             {
                 new MatchEntry { map = "MIRAGE", score = "13 : 9", meta = "TODAY  ·  34 MIN" },
                 new MatchEntry { map = "INFERNO", score = "10 : 13", meta = "TODAY  ·  41 MIN" },
                 new MatchEntry { map = "ANUBIS", score = "13 : 11", meta = "YESTERDAY  ·  38 MIN" },
-                new MatchEntry { map = "NUKE", score = "7 : 13", meta = "YESTERDAY  ·  29 MIN" },
-                new MatchEntry { map = "ANCIENT", score = "13 : 8", meta = "2 DAYS AGO  ·  36 MIN" }
+                new MatchEntry { map = "NUKE", score = "7 : 13", meta = "YESTERDAY  ·  29 MIN" }
             };
 
+            /// <summary>
+            /// Labels match the three headline numbers a demo report actually carries, so the rail does
+            /// not relabel itself the moment a real report replaces the placeholder values.
+            ///
+            /// The pre-report state is authored as empty rather than as plausible-looking figures: a
+            /// filled bar reading "55" under a "K / D" label would be indistinguishable from analysis
+            /// output that nobody produced.
+            /// </summary>
             public MetricEntry[] metrics =
             {
-                new MetricEntry { label = "AIM", value = 0.78f },
-                new MetricEntry { label = "POSITION", value = 0.64f },
-                new MetricEntry { label = "DECISION", value = 0.72f }
+                new MetricEntry { label = "K / D", value = 0f, display = "--" },
+                new MetricEntry { label = "HS %", value = 0f, display = "--" },
+                new MetricEntry { label = "ADR", value = 0f, display = "--" }
             };
 
+            /// <summary>Three cards, because the analysis service returns exactly three insights.</summary>
             public InsightEntry[] insights =
             {
                 new InsightEntry
@@ -426,8 +461,14 @@ namespace FpsAiCoach
                 },
                 new InsightEntry
                 {
-                    title = "UTILITY TIMING",
-                    body = "Deploy smoke 1.5s earlier",
+                    title = "FIRST SHOT",
+                    body = "Hold head level before the peek",
+                    highPriority = false
+                },
+                new InsightEntry
+                {
+                    title = "ROUND IMPACT",
+                    body = "Convert damage into trades",
                     highPriority = false
                 }
             };
@@ -437,6 +478,53 @@ namespace FpsAiCoach
             public string buttonPause = "PAUSE";
             public string buttonLive = "LIVE MODE";
             public string buttonDemo = "DEMO MODE";
+
+            [Header("Demo analysis (CS2 .dem via the local service)")]
+            public string buttonImportDemo = "IMPORT DEMO";
+            public string buttonSampleReport = "SAMPLE";
+
+            public string demoEndpoint = "http://127.0.0.1:8000/api/v1/analyze/demo";
+
+            [Tooltip("Empty means the service picks the top fragger.")]
+            public string demoTargetPlayer = "";
+
+            /// <summary>
+            /// The request body is one buffer holding the whole demo, so the ceiling is available
+            /// memory rather than the service limit. Raised past the original 512 because the body is
+            /// now filled by a single streamed pass instead of a read plus a multipart copy; this
+            /// covers the largest reference demo in the project at roughly 650 MB. The service itself
+            /// accepts up to 1.5 GB.
+            /// </summary>
+            [Tooltip("Client-side upload cap in MB. The service accepts up to 1500.")]
+            public int demoMaxUploadMegabytes = 1024;
+
+            [Tooltip("A 430 MB demo parses in roughly 15 s locally; this leaves room for larger files.")]
+            public int demoTimeoutSeconds = 180;
+
+            public int demoSampleTimeoutSeconds = 10;
+
+            [Header("Metric bar ceilings (a full bar means 'excellent')")]
+            [Tooltip("K/D that fills the bar completely.")]
+            public float metricKdCeiling = 2f;
+
+            [Tooltip("ADR that fills the bar completely.")]
+            public float metricAdrCeiling = 120f;
+
+            [Header("Demo status line")]
+            public string demoStatusIdle = "NO REPORT  ·  IMPORT A DEMO";
+            public string demoStatusSelecting = "SELECTING DEMO";
+            public string demoStatusMissing = "FILE NOT FOUND";
+            public string demoStatusWrongType = "ONLY .dem FILES ARE SUPPORTED";
+            public string demoStatusTooLarge = "DEMO IS {0:N0} MB  ·  LIMIT IS {1} MB";
+            public string demoStatusReading = "READING {0}";
+            public string demoStatusAnalyzing = "ANALYZING {0}";
+            public string demoStatusSample = "LOADING SAMPLE REPORT";
+            public string demoStatusReady = "{0}  ·  {1} ROUNDS";
+            public string demoStatusInvalid = "SERVICE RETURNED AN INVALID REPORT";
+            public string demoStatusOffline = "SERVICE UNREACHABLE  ·  START Backend/run.ps1";
+            public string demoStatusTooLargeForBuffer = "DEMO EXCEEDS THE 2 GB REQUEST BUFFER";
+            public string demoStatusOutOfMemory = "NOT ENOUGH MEMORY TO BUFFER THIS DEMO";
+            public string demoStatusReadTruncated = "DEMO READ ENDED EARLY";
 
             public string statusNoVideo = "NO SIGNAL";
             public string statusSelecting = "SELECTING SOURCE";
@@ -464,6 +552,9 @@ namespace FpsAiCoach
         {
             public string label;
             [Range(0f, 1f)] public float value;
+
+            [Tooltip("Readout text. Leave empty to print the bar fill as a percentage.")]
+            public string display;
         }
 
         [Serializable]

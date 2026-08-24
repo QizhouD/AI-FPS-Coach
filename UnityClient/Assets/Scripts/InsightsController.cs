@@ -16,6 +16,7 @@ namespace FpsAiCoach
         public sealed class MetricBar
         {
             public RectTransform fill;
+            public TMP_Text nameLabel;
             public TMP_Text valueLabel;
             public Image fillImage;
         }
@@ -45,6 +46,16 @@ namespace FpsAiCoach
 
         public void SetMetric(int index, float normalized)
         {
+            SetMetric(index, normalized, null);
+        }
+
+        /// <summary>
+        /// Sets a bar's fill and its readout. Pass <paramref name="display"/> whenever the number the
+        /// user should read is not the normalized percentage: a K/D of 1.46 fills 73% of the bar but
+        /// must still print as "1.46".
+        /// </summary>
+        public void SetMetric(int index, float normalized, string display)
+        {
             if (metrics == null || index < 0 || index >= metrics.Length)
                 return;
 
@@ -61,7 +72,22 @@ namespace FpsAiCoach
             }
 
             if (metric.valueLabel != null)
-                metric.valueLabel.text = Mathf.RoundToInt(value * 100f).ToString();
+            {
+                metric.valueLabel.text = string.IsNullOrEmpty(display)
+                    ? Mathf.RoundToInt(value * 100f).ToString()
+                    : display;
+            }
+        }
+
+        /// <summary>Renames a bar, for when the loaded data changes what the number means.</summary>
+        public void SetMetricLabel(int index, string label)
+        {
+            if (metrics == null || index < 0 || index >= metrics.Length)
+                return;
+
+            var metric = metrics[index];
+            if (metric?.nameLabel != null)
+                metric.nameLabel.text = label;
         }
 
         public void SetMetrics(IList<float> values)

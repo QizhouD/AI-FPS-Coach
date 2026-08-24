@@ -162,7 +162,8 @@ namespace FpsAiCoach.Editor
             float tracking,
             FontStyles style = FontStyles.Normal,
             bool wrap = false,
-            float? fontSizeOverride = null)
+            float? fontSizeOverride = null,
+            float? autoSizeFloor = null)
         {
             var rect = Rect(name, parent, center, size);
             var text = rect.gameObject.AddComponent<TextMeshProUGUI>();
@@ -177,10 +178,25 @@ namespace FpsAiCoach.Editor
             text.textWrappingMode = wrap
                 ? TextWrappingModes.Normal
                 : TextWrappingModes.NoWrap;
-            text.overflowMode = TextOverflowModes.Overflow;
             text.raycastTarget = false;
             text.outlineColor = theme.Text.outlineColor;
             text.outlineWidth = theme.Text.outlineWidth;
+
+            if (autoSizeFloor.HasValue)
+            {
+                // For labels filled from the analysis service, whose length this project does not
+                // control: TMP shrinks toward the floor to fit the box, and truncates rather than
+                // spilling past the panel if even the floor is too large.
+                text.enableAutoSizing = true;
+                text.fontSizeMax = text.fontSize;
+                text.fontSizeMin = U(autoSizeFloor.Value);
+                text.overflowMode = TextOverflowModes.Truncate;
+            }
+            else
+            {
+                text.overflowMode = TextOverflowModes.Overflow;
+            }
+
             return text;
         }
 
@@ -216,7 +232,8 @@ namespace FpsAiCoach.Editor
             Color fillColor,
             Color textColor,
             float borderUnits,
-            float colliderDepthUnits)
+            float colliderDepthUnits,
+            float? labelEmMeters = null)
         {
             var rect = Rect(name, parent, center, size);
             var host = rect.gameObject;
@@ -238,7 +255,7 @@ namespace FpsAiCoach.Editor
                 Vector2.zero,
                 new Vector2(size.x - borderUnits * 6f, size.y),
                 label,
-                theme.Text.buttonLabel,
+                labelEmMeters ?? theme.Text.buttonLabel,
                 textColor,
                 TextAlignmentOptions.Center,
                 theme.Text.trackingLabel,
@@ -340,6 +357,8 @@ namespace FpsAiCoach.Editor
                 theme.Text.trackingBody,
                 FontStyles.Bold);
 
+            // An analyzed report overwrites this with a player name of unknown length, so it shrinks
+            // rather than running under the score column.
             var meta = Label(
                 "Meta",
                 host.transform,
@@ -349,7 +368,10 @@ namespace FpsAiCoach.Editor
                 theme.Text.rowSecondary,
                 WarRoomColor.ForUi(theme.Colors.textMuted),
                 TextAlignmentOptions.Left,
-                theme.Text.trackingBody);
+                theme.Text.trackingBody,
+                FontStyles.Normal,
+                wrap: false,
+                autoSizeFloor: theme.Text.cardBodyFloor);
 
             var button = host.AddComponent<Button>();
             button.targetGraphic = hover;

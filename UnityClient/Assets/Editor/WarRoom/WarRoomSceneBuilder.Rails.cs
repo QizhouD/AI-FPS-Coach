@@ -144,6 +144,8 @@ namespace FpsAiCoach.Editor
                     colliderDepth);
             }
 
+            BuildLibraryFooter(context, canvas, contentWidth);
+
             var palette = theme.Colors;
             var controller = group.gameObject.AddComponent<MatchLibraryController>();
             controller.Configure(rows);
@@ -161,6 +163,85 @@ namespace FpsAiCoach.Editor
 
             controller.Refresh();
             context.Library = controller;
+        }
+
+        /// <summary>
+        /// Footer of the library rail: the demo analysis entry point. This is what makes the documented
+        /// <c>.dem</c> workflow reachable, so it lives with the match list rather than on the playback
+        /// deck, which drives video review instead.
+        ///
+        /// Anchored to the canvas bottom rather than continued from the row cursor, so the actions stay
+        /// put if the number of seed rows changes.
+        /// </summary>
+        private static void BuildLibraryFooter(
+            WarRoomBuildContext context,
+            Canvas canvas,
+            float contentWidth)
+        {
+            var theme = context.Theme;
+            var rail = theme.Rail;
+            var palette = theme.Colors;
+            var ui = context.Ui;
+
+            var bottom = -ui.U(rail.CanvasSize.y) * 0.5f;
+            var statusHeight = ui.U(rail.footerStatusHeight);
+            var buttonHeight = ui.U(rail.footerButtonHeight);
+            var buttonGap = ui.U(rail.footerButtonGap);
+            var border = ui.U(0.012f);
+            var colliderDepth = ui.U(theme.Deck.buttonColliderDepth);
+
+            var statusY = bottom + ui.U(0.06f) + statusHeight * 0.5f;
+            var buttonY = statusY + statusHeight * 0.5f + ui.U(0.04f) + buttonHeight * 0.5f;
+
+            var primaryWidth = (contentWidth - buttonGap) * rail.footerPrimaryShare;
+            var secondaryWidth = contentWidth - buttonGap - primaryWidth;
+            var left = -contentWidth * 0.5f;
+
+            var ghostFill = WarRoomColor.WithAlpha(WarRoomColor.ForUi(palette.panelGlass), 0.94f);
+
+            context.ImportDemoButton = ui.GhostButton(
+                "IMPORT DEMO Button",
+                canvas.transform,
+                new Vector2(left + primaryWidth * 0.5f, buttonY),
+                new Vector2(primaryWidth, buttonHeight),
+                theme.Data.buttonImportDemo,
+                WarRoomColor.WithAlpha(WarRoomColor.ForUi(palette.cyanPrimary), 0.9f),
+                ghostFill,
+                WarRoomColor.ForUi(palette.textPrimary),
+                border,
+                colliderDepth,
+                theme.Text.footerButtonLabel);
+
+            // The sample report is a verification affordance, not a primary action, so it stays a
+            // muted ghost and never borrows the cyan rim.
+            context.SampleButton = ui.GhostButton(
+                "SAMPLE Button",
+                canvas.transform,
+                new Vector2(left + primaryWidth + buttonGap + secondaryWidth * 0.5f, buttonY),
+                new Vector2(secondaryWidth, buttonHeight),
+                theme.Data.buttonSampleReport,
+                WarRoomColor.WithAlpha(WarRoomColor.ForUi(palette.panelEdge), 0.95f),
+                ghostFill,
+                WarRoomColor.ForUi(palette.textSecondary),
+                border,
+                colliderDepth,
+                theme.Text.footerButtonLabel);
+
+            // Service error detail lands here, so the line wraps and shrinks instead of running past
+            // the rail edge.
+            context.DemoStatusLabel = ui.Label(
+                "Demo Status",
+                canvas.transform,
+                new Vector2(0f, statusY),
+                new Vector2(contentWidth, statusHeight),
+                theme.Data.demoStatusIdle,
+                theme.Text.rowSecondary,
+                WarRoomColor.ForUi(palette.textMuted),
+                TextAlignmentOptions.TopLeft,
+                theme.Text.trackingBody,
+                FontStyles.Normal,
+                wrap: true,
+                autoSizeFloor: theme.Text.cardBodyFloor);
         }
 
         /// <summary>Right rail: metric bars over insight cards, amber reserved for high priority.</summary>
@@ -196,7 +277,7 @@ namespace FpsAiCoach.Editor
                     new Vector2(0f, cursor - rowHeight * 0.5f),
                     new Vector2(contentWidth, rowHeight));
 
-                ui.Label(
+                var nameLabel = ui.Label(
                     "Label",
                     row,
                     new Vector2(-contentWidth * 0.2f, rowHeight * 0.22f),
@@ -208,12 +289,16 @@ namespace FpsAiCoach.Editor
                     theme.Text.trackingLabel,
                     FontStyles.Bold);
 
+                // Authored from the same theme values the runtime applies in Start, so the scene reads
+                // identically in the editor and in play mode instead of showing a stale default.
                 var valueLabel = ui.Label(
                     "Value",
                     row,
                     new Vector2(contentWidth * 0.3f, rowHeight * 0.18f),
                     new Vector2(contentWidth * 0.4f, rowHeight * 0.5f),
-                    "0",
+                    string.IsNullOrEmpty(entry.display)
+                        ? Mathf.RoundToInt(entry.value * 100f).ToString()
+                        : entry.display,
                     theme.Text.metricValue,
                     WarRoomColor.ForUi(palette.textPrimary),
                     TextAlignmentOptions.Right,
@@ -232,12 +317,13 @@ namespace FpsAiCoach.Editor
                     "Fill",
                     row,
                     trackLeft,
-                    new Vector2(barWidth * 0.5f, barHeight),
+                    new Vector2(barWidth * Mathf.Clamp01(entry.value), barHeight),
                     WarRoomColor.ForUi(palette.cyanDim));
 
                 metrics[index] = new InsightsController.MetricBar
                 {
                     fill = fill.rectTransform,
+                    nameLabel = nameLabel,
                     valueLabel = valueLabel,
                     fillImage = fill
                 };
@@ -291,30 +377,35 @@ namespace FpsAiCoach.Editor
                 var textLeft = -contentWidth * 0.5f + cardBorder + cardIndicator + ui.U(0.11f);
                 var textWidth = contentWidth - (cardBorder + cardIndicator + ui.U(0.11f)) - ui.U(0.1f);
 
+                // Both slots wrap and auto-size: the authored copy is short, but a loaded report fills
+                // these with service sentences whose length this scene cannot predict.
                 var titleLabel = ui.Label(
                     "Title",
                     card.transform,
-                    new Vector2(textLeft + textWidth * 0.5f, cardHeight * 0.22f),
-                    new Vector2(textWidth, cardHeight * 0.4f),
+                    new Vector2(textLeft + textWidth * 0.5f, cardHeight * 0.26f),
+                    new Vector2(textWidth, cardHeight * 0.42f),
                     entry.title,
                     theme.Text.cardTitle,
                     WarRoomColor.ForUi(palette.textPrimary),
-                    TextAlignmentOptions.Left,
+                    TextAlignmentOptions.TopLeft,
                     theme.Text.trackingLabel,
-                    FontStyles.Bold);
+                    FontStyles.Bold,
+                    wrap: true,
+                    autoSizeFloor: theme.Text.cardTitleFloor);
 
                 var bodyLabel = ui.Label(
                     "Body",
                     card.transform,
-                    new Vector2(textLeft + textWidth * 0.5f, -cardHeight * 0.2f),
-                    new Vector2(textWidth, cardHeight * 0.45f),
+                    new Vector2(textLeft + textWidth * 0.5f, -cardHeight * 0.24f),
+                    new Vector2(textWidth, cardHeight * 0.46f),
                     entry.body,
                     theme.Text.cardBody,
                     WarRoomColor.ForUi(palette.textSecondary),
                     TextAlignmentOptions.TopLeft,
                     theme.Text.trackingBody,
                     FontStyles.Normal,
-                    wrap: true);
+                    wrap: true,
+                    autoSizeFloor: theme.Text.cardBodyFloor);
 
                 cards[index] = new InsightsController.InsightCard
                 {

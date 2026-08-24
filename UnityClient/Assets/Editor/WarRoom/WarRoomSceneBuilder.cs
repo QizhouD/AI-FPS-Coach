@@ -237,9 +237,23 @@ namespace FpsAiCoach.Editor
                 screenMetrics.trackWidth,
                 screenMetrics.progressMinWidth);
 
+            var demo = root.AddComponent<DemoAnalysisController>();
+            demo.Configure(theme);
+
             var hud = root.AddComponent<StudioHudController>();
-            hud.Configure(theme, screen, context.Timeline, animator, context.Library, context.Insights);
+            hud.Configure(
+                theme,
+                screen,
+                context.Timeline,
+                animator,
+                context.Library,
+                context.Insights,
+                demo);
             hud.BindButtons(context.ImportButton, context.PlayButton, context.LiveButton);
+            hud.BindLibraryFooter(
+                context.ImportDemoButton,
+                context.SampleButton,
+                context.DemoStatusLabel);
             hud.BindLabels(
                 context.ScreenStatusLabel,
                 context.TimecodeLabel,

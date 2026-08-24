@@ -31,19 +31,26 @@ namespace FpsAiCoach
         [SerializeField] private StudioAnimator studioAnimator;
         [SerializeField] private MatchLibraryController library;
         [SerializeField] private InsightsController insights;
+        [SerializeField] private DemoAnalysisController demoAnalysis;
 
         [Header("Deck buttons")]
         [SerializeField] private DeckButton importButton = new DeckButton();
         [SerializeField] private DeckButton playButton = new DeckButton();
         [SerializeField] private DeckButton liveButton = new DeckButton();
 
+        [Header("Library footer buttons")]
+        [SerializeField] private DeckButton importDemoButton = new DeckButton();
+        [SerializeField] private DeckButton sampleButton = new DeckButton();
+
         [Header("Labels")]
         [SerializeField] private TMP_Text screenStatusLabel;
         [SerializeField] private TMP_Text timecodeLabel;
         [SerializeField] private TMP_Text headerModeLabel;
         [SerializeField] private TMP_Text headerMatchLabel;
+        [SerializeField] private TMP_Text demoStatusLabel;
 
         private int lastImportFrame = -1;
+        private int lastDemoFrame = -1;
         private bool liveRequested;
 
         public void Configure(
@@ -52,7 +59,8 @@ namespace FpsAiCoach
             TimelineController configuredTimeline,
             StudioAnimator configuredAnimator,
             MatchLibraryController configuredLibrary,
-            InsightsController configuredInsights)
+            InsightsController configuredInsights,
+            DemoAnalysisController configuredDemoAnalysis)
         {
             theme = configuredTheme;
             screen = configuredScreen;
@@ -60,6 +68,7 @@ namespace FpsAiCoach
             studioAnimator = configuredAnimator;
             library = configuredLibrary;
             insights = configuredInsights;
+            demoAnalysis = configuredDemoAnalysis;
         }
 
         public void BindButtons(DeckButton import, DeckButton play, DeckButton live)
@@ -67,6 +76,13 @@ namespace FpsAiCoach
             importButton = import;
             playButton = play;
             liveButton = live;
+        }
+
+        public void BindLibraryFooter(DeckButton importDemo, DeckButton sample, TMP_Text status)
+        {
+            importDemoButton = importDemo;
+            sampleButton = sample;
+            demoStatusLabel = status;
         }
 
         public void BindLabels(TMP_Text status, TMP_Text timecode, TMP_Text mode, TMP_Text match)
@@ -85,9 +101,19 @@ namespace FpsAiCoach
                 playButton.button.onClick.AddListener(HandlePlayClicked);
             if (liveButton?.button != null)
                 liveButton.button.onClick.AddListener(HandleLiveClicked);
+            if (importDemoButton?.button != null)
+                importDemoButton.button.onClick.AddListener(HandleImportDemoClicked);
+            if (sampleButton?.button != null)
+                sampleButton.button.onClick.AddListener(HandleSampleClicked);
 
             if (screen != null)
                 screen.StateChanged += HandleScreenStateChanged;
+
+            if (demoAnalysis != null)
+            {
+                demoAnalysis.StateChanged += HandleDemoStateChanged;
+                demoAnalysis.ReportLoaded += HandleReportLoaded;
+            }
 
             if (library != null)
             {
@@ -97,6 +123,7 @@ namespace FpsAiCoach
 
             ApplyInsightContent();
             HandleScreenStateChanged();
+            HandleDemoStateChanged();
             timeline?.SetProgress(0f);
         }
 
@@ -108,9 +135,20 @@ namespace FpsAiCoach
                 playButton.button.onClick.RemoveListener(HandlePlayClicked);
             if (liveButton?.button != null)
                 liveButton.button.onClick.RemoveListener(HandleLiveClicked);
+            if (importDemoButton?.button != null)
+                importDemoButton.button.onClick.RemoveListener(HandleImportDemoClicked);
+            if (sampleButton?.button != null)
+                sampleButton.button.onClick.RemoveListener(HandleSampleClicked);
 
             if (screen != null)
                 screen.StateChanged -= HandleScreenStateChanged;
+
+            if (demoAnalysis != null)
+            {
+                demoAnalysis.StateChanged -= HandleDemoStateChanged;
+                demoAnalysis.ReportLoaded -= HandleReportLoaded;
+            }
+
             if (library != null)
                 library.SelectionChanged -= HandleMatchSelected;
         }
@@ -182,6 +220,22 @@ namespace FpsAiCoach
             SetLabel(liveButton?.label, theme.Data.buttonDemo);
         }
 
+        private void HandleImportDemoClicked()
+        {
+            // Same guard as the video import: a world-space ray click and a UI click can both land in
+            // one frame, which would otherwise open two file dialogs.
+            if (lastDemoFrame == Time.frameCount)
+                return;
+            lastDemoFrame = Time.frameCount;
+
+            demoAnalysis?.SelectAndAnalyze();
+        }
+
+        private void HandleSampleClicked()
+        {
+            demoAnalysis?.LoadSample();
+        }
+
         private void HandleMatchSelected(int index)
         {
             if (headerMatchLabel == null || library == null)
@@ -189,6 +243,145 @@ namespace FpsAiCoach
 
             var map = library.SelectedMapName();
             headerMatchLabel.text = string.IsNullOrEmpty(map) ? string.Empty : map;
+        }
+
+        // ------------------------------------------------------------------ demo analysis
+
+        private void HandleDemoStateChanged()
+        {
+            if (demoAnalysis == null)
+                return;
+
+            SetLabel(demoStatusLabel, demoAnalysis.StatusMessage);
+
+            if (demoStatusLabel != null && theme != null)
+            {
+                var palette = theme.Colors;
+                demoStatusLabel.color = demoAnalysis.State switch
+                {
+                    DemoAnalysisState.Ready => WarRoomColor.ForUi(palette.cyanPrimary),
+                    DemoAnalysisState.Failed => WarRoomColor.ForUi(palette.amberAlert),
+                    DemoAnalysisState.Rejected => WarRoomColor.ForUi(palette.amberAlert),
+                    _ => WarRoomColor.ForUi(palette.textMuted)
+                };
+            }
+
+            var idle = !demoAnalysis.IsBusy;
+            SetInteractable(importDemoButton, idle);
+            SetInteractable(sampleButton, idle);
+        }
+
+        /// <summary>
+        /// Moves a report onto the rails: the analyzed match takes the most-recent library slot, the
+        /// three metric bars take the headline numbers, and the cards take the service's insights.
+        /// </summary>
+        private void HandleReportLoaded(DemoReport report)
+        {
+            if (report == null || theme == null)
+                return;
+
+            var data = theme.Data;
+            var stats = report.player ?? new DemoPlayerStats();
+
+            if (library != null && library.RowCount > 0)
+            {
+                library.SetRow(
+                    0,
+                    FormatMapName(report.map_name),
+                    $"{stats.kills} : {stats.deaths}",
+                    $"{Upper(stats.name)}  ·  {report.rounds} ROUNDS");
+                library.ForceSelect(0);
+            }
+
+            if (insights != null)
+            {
+                // Bars are normalized against "excellent" ceilings from the theme, while the readout
+                // keeps the real figure: a K/D of 1.46 fills 73% of the bar but still prints as 1.46.
+                insights.SetMetric(
+                    0,
+                    stats.kd_ratio / Mathf.Max(0.01f, data.metricKdCeiling),
+                    stats.kd_ratio.ToString("0.00"));
+
+                insights.SetMetric(
+                    1,
+                    stats.headshot_percentage / 100f,
+                    Mathf.RoundToInt(stats.headshot_percentage).ToString());
+
+                insights.SetMetric(
+                    2,
+                    stats.adr / Mathf.Max(0.01f, data.metricAdrCeiling),
+                    Mathf.RoundToInt(stats.adr).ToString());
+
+                ApplyReportCards(report);
+            }
+        }
+
+        private void ApplyReportCards(DemoReport report)
+        {
+            var priority = WarRoomColor.ForUi(theme.Colors.amberAlert);
+            var normal = WarRoomColor.ForUi(theme.Colors.blueElectric);
+            var reported = report.insights ?? Array.Empty<DemoInsight>();
+            var cards = theme.Data.insights.Length;
+
+            for (var index = 0; index < cards; index++)
+            {
+                if (index >= reported.Length)
+                {
+                    // Stale placeholder copy next to a real report would read as analysis output, so
+                    // unused cards are emptied rather than left as authored.
+                    insights.SetCard(index, string.Empty, string.Empty, false, priority, normal);
+                    continue;
+                }
+
+                var entry = reported[index];
+                insights.SetCard(
+                    index,
+                    Upper(entry.title),
+                    entry.evidence,
+                    IsUrgent(entry.severity),
+                    priority,
+                    normal);
+            }
+        }
+
+        private static bool IsUrgent(string severity)
+        {
+            if (string.IsNullOrEmpty(severity))
+                return false;
+
+            return severity.Equals("warning", StringComparison.OrdinalIgnoreCase) ||
+                   severity.Equals("danger", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Turns a service map id into rail copy: <c>de_mirage</c> reads as <c>MIRAGE</c>, matching how
+        /// the seed rows are authored.
+        /// </summary>
+        private static string FormatMapName(string mapName)
+        {
+            if (string.IsNullOrWhiteSpace(mapName))
+                return "UNKNOWN";
+
+            var trimmed = mapName.Trim();
+            foreach (var prefix in MapPrefixes)
+            {
+                if (trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    trimmed = trimmed.Substring(prefix.Length);
+                    break;
+                }
+            }
+
+            return Upper(trimmed);
+        }
+
+        private static readonly string[] MapPrefixes = { "de_", "cs_", "ar_" };
+
+        private static string Upper(string value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? string.Empty
+                : value.Trim().ToUpperInvariant();
         }
 
         // ------------------------------------------------------------------ state mirroring
@@ -251,7 +444,7 @@ namespace FpsAiCoach
 
             var metrics = theme.Data.metrics;
             for (var index = 0; index < metrics.Length && index < insights.MetricCount; index++)
-                insights.SetMetric(index, metrics[index].value);
+                insights.SetMetric(index, metrics[index].value, metrics[index].display);
 
             var cards = theme.Data.insights;
             var priority = WarRoomColor.ForUi(theme.Colors.amberAlert);

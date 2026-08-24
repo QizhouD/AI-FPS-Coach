@@ -113,11 +113,16 @@ MonoBehaviour:
     rowGap: 0.06
     rowIndicatorWidth: 0.05
     headerHeight: 0.42
-    metricRowHeight: 0.62
+    footerButtonHeight: 0.4
+    footerPrimaryShare: 0.66
+    footerButtonGap: 0.06
+    footerStatusHeight: 0.26
+    footerTopGap: 0.08
+    metricRowHeight: 0.54
     metricBarHeight: 0.075
     metricBarWidth: 2.26
-    cardHeight: 0.86
-    cardGap: 0.1
+    cardHeight: 0.62
+    cardGap: 0.08
     cardIndicatorWidth: 0.055
   header:
     centerY: 6.72
@@ -149,7 +154,10 @@ MonoBehaviour:
     metricValue: 0.32
     cardTitle: 0.155
     cardBody: 0.125
+    cardTitleFloor: 0.095
+    cardBodyFloor: 0.088
     buttonLabel: 0.19
+    footerButtonLabel: 0.12
     screenStatus: 0.16
     timecode: 0.16
     trackingTitle: 12
@@ -205,28 +213,54 @@ MonoBehaviour:
     - map: NUKE
       score: '7 : 13'
       meta: "YESTERDAY  \xB7  29 MIN"
-    - map: ANCIENT
-      score: '13 : 8'
-      meta: "2 DAYS AGO  \xB7  36 MIN"
     metrics:
-    - label: AIM
-      value: 0.78
-    - label: POSITION
-      value: 0.64
-    - label: DECISION
-      value: 0.72
+    - label: K / D
+      value: 0
+      display: --
+    - label: HS %
+      value: 0
+      display: --
+    - label: ADR
+      value: 0
+      display: --
     insights:
     - title: OPENING DUELS
       body: Review trade spacing on A entry
       highPriority: 1
-    - title: UTILITY TIMING
-      body: Deploy smoke 1.5s earlier
+    - title: FIRST SHOT
+      body: Hold head level before the peek
+      highPriority: 0
+    - title: ROUND IMPACT
+      body: Convert damage into trades
       highPriority: 0
     buttonImport: IMPORT VIDEO
     buttonPlay: PLAY
     buttonPause: PAUSE
     buttonLive: LIVE MODE
     buttonDemo: DEMO MODE
+    buttonImportDemo: IMPORT DEMO
+    buttonSampleReport: SAMPLE
+    demoEndpoint: http://127.0.0.1:8000/api/v1/analyze/demo
+    demoTargetPlayer: 
+    demoMaxUploadMegabytes: 1024
+    demoTimeoutSeconds: 180
+    demoSampleTimeoutSeconds: 10
+    metricKdCeiling: 2
+    metricAdrCeiling: 120
+    demoStatusIdle: "NO REPORT  \xB7  IMPORT A DEMO"
+    demoStatusSelecting: SELECTING DEMO
+    demoStatusMissing: FILE NOT FOUND
+    demoStatusWrongType: ONLY .dem FILES ARE SUPPORTED
+    demoStatusTooLarge: "DEMO IS {0:N0} MB  \xB7  LIMIT IS {1} MB"
+    demoStatusReading: READING {0}
+    demoStatusAnalyzing: ANALYZING {0}
+    demoStatusSample: LOADING SAMPLE REPORT
+    demoStatusReady: "{0}  \xB7  {1} ROUNDS"
+    demoStatusInvalid: SERVICE RETURNED AN INVALID REPORT
+    demoStatusOffline: "SERVICE UNREACHABLE  \xB7  START Backend/run.ps1"
+    demoStatusTooLargeForBuffer: DEMO EXCEEDS THE 2 GB REQUEST BUFFER
+    demoStatusOutOfMemory: NOT ENOUGH MEMORY TO BUFFER THIS DEMO
+    demoStatusReadTruncated: DEMO READ ENDED EARLY
     statusNoVideo: NO SIGNAL
     statusSelecting: SELECTING SOURCE
     statusLoading: LOADING

@@ -136,6 +136,42 @@ namespace FpsAiCoach
             }
         }
 
+        /// <summary>
+        /// Overwrites a row's text. Used when an analyzed report takes the most-recent slot, so the
+        /// rail shows the match actually being reviewed instead of seed content.
+        /// </summary>
+        public void SetRow(int index, string map, string score, string meta)
+        {
+            if (rows == null || index < 0 || index >= rows.Length)
+                return;
+
+            var row = rows[index];
+            if (row == null)
+                return;
+
+            if (row.mapLabel != null)
+                row.mapLabel.text = map;
+            if (row.scoreLabel != null)
+                row.scoreLabel.text = score;
+            if (row.metaLabel != null)
+                row.metaLabel.text = meta;
+        }
+
+        /// <summary>
+        /// Selects a row and reapplies visuals even when the index is unchanged, which
+        /// <see cref="Select"/> deliberately skips. Needed when a row's content is replaced while it is
+        /// already the selected one.
+        /// </summary>
+        public void ForceSelect(int index)
+        {
+            if (rows.Length == 0)
+                return;
+
+            selectedIndex = Mathf.Clamp(index, 0, rows.Length - 1);
+            Refresh();
+            SelectionChanged?.Invoke(selectedIndex);
+        }
+
         /// <summary>Returns the map label of the selected row, for the header readout.</summary>
         public string SelectedMapName()
         {

@@ -108,4 +108,25 @@ namespace FpsAiCoach
         public DemoInsight[] insights = Array.Empty<DemoInsight>();
         public DemoPlayback playback = new DemoPlayback();
     }
+
+    /// <summary>
+    /// The same payload as <see cref="DemoAnalysisResponse"/> with the playback track left out.
+    ///
+    /// A full pro demo answers with roughly 6,000 sampled frames of 10 players each, which is about
+    /// 9 MB of JSON and 60,000 objects once deserialized. The war-room rails only ever read the
+    /// header, the player line and the insights, so this type omits <c>playback</c> entirely and
+    /// JsonUtility skips those keys instead of allocating them. Deserialize into
+    /// <see cref="DemoAnalysisResponse"/> only once something actually draws the 2D replay.
+    /// </summary>
+    [Serializable]
+    public sealed class DemoReport
+    {
+        public string analysis_id;
+        public string file_name;
+        public string map_name;
+        public int rounds;
+        public string data_source;
+        public DemoPlayerStats player = new DemoPlayerStats();
+        public DemoInsight[] insights = Array.Empty<DemoInsight>();
+    }
 }

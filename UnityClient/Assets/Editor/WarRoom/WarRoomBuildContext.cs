@@ -35,6 +35,11 @@ namespace FpsAiCoach.Editor
         public MatchLibraryController Library;
         public InsightsController Insights;
 
+        // Match library footer (demo analysis entry point)
+        public StudioHudController.DeckButton ImportDemoButton;
+        public StudioHudController.DeckButton SampleButton;
+        public TMP_Text DemoStatusLabel;
+
         // Control deck
         public StudioHudController.DeckButton ImportButton;
         public StudioHudController.DeckButton PlayButton;
