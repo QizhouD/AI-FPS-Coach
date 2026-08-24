@@ -12,7 +12,12 @@ namespace FpsAiCoach
     public sealed class VisionInferenceOverlay : MonoBehaviour
     {
         private const float OverlayWidth = 1000f;
-        private const float OverlayHeight = 405f;
+
+        /// <summary>
+        /// Derived from the display surface at runtime rather than hard-coded, so detection boxes stay
+        /// registered with the video no matter how the screen is proportioned.
+        /// </summary>
+        private float overlayHeight = OverlayWidth * 9f / 16f;
 
         [Header("Vision API")]
         [SerializeField] private string frameEndpoint =
@@ -59,16 +64,16 @@ namespace FpsAiCoach
             CreateOverlay();
             nextSampleTime = 0f;
 
-            var view = GetComponent<CoachStudioTemplateView>();
-            if (view != null)
-                view.VideoPathLoaded += HandleVideoPathLoaded;
+            var screen = GetComponent<TacticalScreenController>();
+            if (screen != null)
+                screen.VideoPathLoaded += HandleVideoPathLoaded;
         }
 
         private void OnDestroy()
         {
-            var view = GetComponent<CoachStudioTemplateView>();
-            if (view != null)
-                view.VideoPathLoaded -= HandleVideoPathLoaded;
+            var screen = GetComponent<TacticalScreenController>();
+            if (screen != null)
+                screen.VideoPathLoaded -= HandleVideoPathLoaded;
             if (whiteTexture != null)
                 Destroy(whiteTexture);
             if (lineMaterial != null)
@@ -218,7 +223,9 @@ namespace FpsAiCoach
                 "Vision Overlay Canvas",
                 typeof(RectTransform),
                 typeof(Canvas));
-            canvasObject.transform.SetParent(transform, false);
+            // Parented alongside the viewport rather than to the root, so the overlay tracks the
+            // surface wherever it sits in the hierarchy.
+            canvasObject.transform.SetParent(viewportTransform.parent, false);
             overlayCanvas = canvasObject.GetComponent<Canvas>();
             overlayCanvas.renderMode = RenderMode.WorldSpace;
             overlayCanvas.worldCamera = Camera.main;
@@ -227,10 +234,14 @@ namespace FpsAiCoach
                 viewportTransform.localPosition + new Vector3(0f, 0f, -0.065f);
             canvasObject.transform.localRotation = viewportTransform.localRotation;
 
+            var viewportScale = viewportTransform.localScale;
+            overlayHeight = viewportScale.x > 0.0001f
+                ? OverlayWidth * (viewportScale.y / viewportScale.x)
+                : OverlayWidth * 9f / 16f;
+
             overlayRect = canvasObject.GetComponent<RectTransform>();
-            overlayRect.sizeDelta = new Vector2(OverlayWidth, OverlayHeight);
-            overlayRect.localScale = Vector3.one *
-                (viewportTransform.localScale.x / OverlayWidth);
+            overlayRect.sizeDelta = new Vector2(OverlayWidth, overlayHeight);
+            overlayRect.localScale = Vector3.one * (viewportScale.x / OverlayWidth);
 
             whiteTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
             whiteTexture.SetPixel(0, 0, Color.white);
@@ -474,7 +485,7 @@ namespace FpsAiCoach
                         (enemy.x2 - enemy.x1) * OverlayWidth),
                     Mathf.Max(
                         3f,
-                        (enemy.y2 - enemy.y1) * OverlayHeight));
+                        (enemy.y2 - enemy.y1) * overlayHeight));
                 SetMarkerPosition(
                     box,
                     (enemy.x1 + enemy.x2) * 0.5f,
@@ -492,7 +503,7 @@ namespace FpsAiCoach
         {
             marker.rectTransform.anchoredPosition = new Vector2(
                 (Mathf.Clamp01(normalizedX) - 0.5f) * OverlayWidth,
-                (0.5f - Mathf.Clamp01(normalizedY)) * OverlayHeight);
+                (0.5f - Mathf.Clamp01(normalizedY)) * overlayHeight);
         }
 
         private Vector3 MarkerWorldPosition(RawImage marker)

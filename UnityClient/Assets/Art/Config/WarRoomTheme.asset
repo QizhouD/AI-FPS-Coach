@@ -1,0 +1,240 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d2ea3799a3efb54c9b94c0325afb107, type: 3}
+  m_Name: WarRoomTheme
+  m_EditorClassIdentifier: Assembly-CSharp::FpsAiCoach.WarRoomTheme
+  palette:
+    voidBackdrop: {r: 0.019607844, g: 0.03137255, b: 0.047058824, a: 1}
+    floorBase: {r: 0.043137256, g: 0.06666667, b: 0.09411765, a: 1}
+    screenBase: {r: 0.039215688, g: 0.05882353, b: 0.08627451, a: 1}
+    panelGlass: {r: 0.05490196, g: 0.078431375, b: 0.10980392, a: 1}
+    panelEdge: {r: 0.105882354, g: 0.15294118, b: 0.2, a: 1}
+    panelRaised: {r: 0.07450981, g: 0.10980392, b: 0.14901961, a: 1}
+    cyanPrimary: {r: 0, g: 0.8980392, b: 1, a: 1}
+    cyanDim: {r: 0, g: 0.7607843, b: 0.8509804, a: 1}
+    blueElectric: {r: 0.23137255, g: 0.50980395, b: 0.9647059, a: 1}
+    amberAlert: {r: 1, g: 0.41960785, b: 0.17254902, a: 1}
+    textPrimary: {r: 1, g: 1, b: 1, a: 1}
+    textBright: {r: 0.78431374, g: 0.8392157, b: 0.8784314, a: 1}
+    textSecondary: {r: 0.56078434, g: 0.6392157, b: 0.7019608, a: 1}
+    textMuted: {r: 0.3529412, g: 0.41960785, b: 0.47843137, a: 1}
+    glowIntensity: 1
+    floorGuideDim: 0.42
+    frameDim: 0.55
+    glassOpacity: 0.9
+  room:
+    floorCenter: {x: 0, y: -0.45, z: 2.5}
+    floorSize: {x: 20, y: 0.5, z: 15}
+    backWallCenter: {x: 0, y: 4.5, z: 8.6}
+    backWallSize: {x: 20, y: 10, z: 0.4}
+    sideWallX: 9.5
+    sideWallCenter: {x: 0, y: 3.6, z: 2.5}
+    sideWallSize: {x: 0.3, y: 8, z: 13}
+    railCount: 5
+    railSpacing: 2.7
+    railLength: 7.4
+    railThickness: 0.02
+    railY: 0.036
+    railZ: 3.4
+    tickCount: 2
+    tickZStart: 0
+    tickSpacing: 4.8
+    tickLength: 14.4
+    tickThickness: 0.02
+    tickY: 0.032
+    platformCenter: {x: 0, y: -0.06, z: 3.4}
+    platformSize: {x: 15, y: 0.18, z: 7.6}
+    platformEdgeThickness: 0.022
+    columnX: 7.55
+    columnY: 3.5
+    columnZ: 6.6
+    columnSize: {x: 0.16, y: 7, z: 0.3}
+    columnAccentThickness: 0.032
+    columnAccentInset: 0.17
+    beamY: 7.05
+    beamZ: 6.6
+    beamSize: {x: 15.4, y: 0.14, z: 0.3}
+    beamHairlineDrop: 0.1
+    beamHairlineLength: 15
+  screen:
+    anchor: {x: 0, y: 3.85, z: 6.3}
+    width: 7.6
+    aspect: 1.7777778
+    surfaceDepth: 0.08
+    backplatePadding: 0.32
+    backplateDepth: 0.16
+    backplateZ: 0.1
+    frameZ: -0.06
+    frameMargin: 0.0625
+    frameThickness: 0.022
+    bracketLength: 0.85
+    bracketThickness: 0.032
+    reticleZ: -0.16
+    reticleArmLength: 0.62
+    reticleThickness: 0.028
+    reticleRotationSpeed: 22
+    markerCount: 10
+    markerDiameter: 0.1
+    markerZ: -0.16
+    statusStripHeight: 0.3
+    statusStripGap: 0.14
+    statusStripDepth: 0.1
+    timelineGap: 0.48
+    trackWidth: 7.3
+    trackHeight: 0.1
+    trackDepth: 0.08
+    progressHeight: 0.06
+    progressMinWidth: 0.04
+    eventCount: 6
+    eventSpacing: 1.2
+    eventDiameter: 0.1
+    highPriorityEventIndex: 3
+  rail:
+    offsetX: 5.45
+    centerY: 3.85
+    centerZ: 6.42
+    backplateSize: {x: 2.6, y: 4.6}
+    backplateDepth: 0.14
+    backplateZ: 0.1
+    hairlineZ: -0.05
+    hairlineThickness: 0.022
+    canvasInset: {x: 0.2, y: 0.24}
+    canvasZ: -0.09
+    rowHeight: 0.72
+    rowGap: 0.06
+    rowIndicatorWidth: 0.05
+    headerHeight: 0.42
+    metricRowHeight: 0.62
+    metricBarHeight: 0.075
+    metricBarWidth: 2.26
+    cardHeight: 0.86
+    cardGap: 0.1
+    cardIndicatorWidth: 0.055
+  header:
+    centerY: 6.72
+    centerZ: 6.44
+    canvasSize: {x: 13.4, y: 0.62}
+    beaconPosition: {x: -6.55, y: 6.72, z: 6.38}
+    beaconDiameter: 0.13
+    beaconPulseSpeed: 2
+    beaconPulseAmount: 0.09
+  deck:
+    deckCenter: {x: 0, y: 0.86, z: 3.05}
+    deckSize: {x: 9.2, y: 0.26, z: 2}
+    deckTiltX: -7
+    deckEdgeThickness: 0.022
+    buttonRowY: 1.24
+    buttonRowZ: 2.42
+    buttonSize: {x: 2.3, y: 0.5}
+    buttonSpacing: 2.9
+    canvasSize: {x: 9.4, y: 0.86}
+    buttonBorder: 0.018
+    buttonColliderDepth: 0.4
+  typography:
+    headerTitle: 0.3
+    headerMeta: 0.15
+    sectionLabel: 0.16
+    rowPrimary: 0.18
+    rowSecondary: 0.12
+    metricLabel: 0.145
+    metricValue: 0.32
+    cardTitle: 0.155
+    cardBody: 0.125
+    buttonLabel: 0.19
+    screenStatus: 0.16
+    timecode: 0.16
+    trackingTitle: 12
+    trackingLabel: 8
+    trackingBody: 0
+    outlineWidth: 0.1
+    outlineColor: {r: 0, g: 0.02, b: 0.05, a: 0.85}
+  canvas:
+    unitsPerMeter: 1000
+    dynamicPixelsPerUnit: 12
+    sortingOrderHeader: 20
+    sortingOrderRail: 20
+    sortingOrderScreen: 30
+    sortingOrderDeck: 40
+    sortingOrderScreenSpace: 100
+  lighting:
+    keyRotation: {x: 42, y: -22, z: 0}
+    keyColor: {r: 0.42, g: 0.55, b: 0.8, a: 1}
+    keyIntensity: 0.55
+    accentPosition: {x: -4.4, y: 4.6, z: 3.2}
+    accentColor: {r: 0.05, g: 0.72, b: 0.95, a: 1}
+    accentIntensity: 1.5
+    accentRange: 8.5
+    fillPosition: {x: 4.6, y: 4.2, z: 3}
+    fillColor: {r: 0.1, g: 0.24, b: 0.92, a: 1}
+    fillIntensity: 1.2
+    fillRange: 8
+    ambient: {r: 0.014, g: 0.02, b: 0.03, a: 1}
+  cameraRig:
+    position: {x: 0, y: 2.92, z: -8.4}
+    lookAt: {x: 0, y: 3.55, z: 5}
+    fieldOfView: 30
+    nearClip: 0.1
+    farClip: 60
+    background: {r: 0.004, g: 0.007, b: 0.011, a: 1}
+  content:
+    productName: FPS COACH
+    moduleName: ANALYSIS STUDIO
+    buildTag: WAR ROOM  v0.2
+    libraryTitle: MATCH LIBRARY
+    insightsTitle: COACH INSIGHTS
+    screenTitle: VIDEO REVIEW
+    matches:
+    - map: MIRAGE
+      score: '13 : 9'
+      meta: "TODAY  \xB7  34 MIN"
+    - map: INFERNO
+      score: '10 : 13'
+      meta: "TODAY  \xB7  41 MIN"
+    - map: ANUBIS
+      score: '13 : 11'
+      meta: "YESTERDAY  \xB7  38 MIN"
+    - map: NUKE
+      score: '7 : 13'
+      meta: "YESTERDAY  \xB7  29 MIN"
+    - map: ANCIENT
+      score: '13 : 8'
+      meta: "2 DAYS AGO  \xB7  36 MIN"
+    metrics:
+    - label: AIM
+      value: 0.78
+    - label: POSITION
+      value: 0.64
+    - label: DECISION
+      value: 0.72
+    insights:
+    - title: OPENING DUELS
+      body: Review trade spacing on A entry
+      highPriority: 1
+    - title: UTILITY TIMING
+      body: Deploy smoke 1.5s earlier
+      highPriority: 0
+    buttonImport: IMPORT VIDEO
+    buttonPlay: PLAY
+    buttonPause: PAUSE
+    buttonLive: LIVE MODE
+    buttonDemo: DEMO MODE
+    statusNoVideo: NO SIGNAL
+    statusSelecting: SELECTING SOURCE
+    statusLoading: LOADING
+    statusReadyPrefix: READY
+    statusError: DECODE ERROR
+    statusUnsupported: UNSUPPORTED FORMAT
+    statusMissing: FILE NOT FOUND
+    statusLive: LIVE CAPTURE
+    statusLiveUnavailable: NO CAPTURE DEVICE
+    modeDemo: DEMO
+    modeLive: LIVE

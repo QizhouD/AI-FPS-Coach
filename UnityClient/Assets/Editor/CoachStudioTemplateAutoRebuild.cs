@@ -25,7 +25,7 @@ namespace FpsAiCoach.Editor
                 return;
             }
 
-            CoachStudioTemplateBuilder.CreateTemplate();
+            WarRoomSceneBuilder.Build();
             AssetDatabase.DeleteAsset(TriggerPath);
             AssetDatabase.SaveAssets();
             Debug.Log("Completed the requested one-time FPS Coach Studio rebuild.");

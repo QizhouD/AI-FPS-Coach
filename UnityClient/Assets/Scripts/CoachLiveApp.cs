@@ -51,6 +51,23 @@ namespace FpsAiCoach
         private bool demoRequestInFlight;
         private DemoAnalysisResponse demoResult;
 
+        /// <summary>
+        /// Bootstrapped before the first scene loads, so the war-room HUD can always reach the
+        /// capture pipeline without holding a serialized reference across scenes.
+        /// </summary>
+        public static CoachLiveApp Instance { get; private set; }
+
+        /// <summary>Texture of the running capture device, or null when capture is stopped.</summary>
+        public Texture LiveTexture => source;
+
+        /// <summary>Name of the active capture device, for the status readout.</summary>
+        public string LiveDeviceName =>
+            source != null && devices.Length > 0 ? devices[selectedDevice] : string.Empty;
+
+        public bool IsLiveSourceActive => source != null && source.isPlaying;
+
+        public string ConnectionState => connectionState;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Bootstrap()
         {
@@ -64,6 +81,7 @@ namespace FpsAiCoach
 
         private void Awake()
         {
+            Instance = this;
             Application.runInBackground = true;
             endpoint = PlayerPrefs.GetString(EndpointKey, endpoint);
             demoMode = PlayerPrefs.GetInt(DemoModeKey, 1) == 1;
@@ -72,9 +90,24 @@ namespace FpsAiCoach
 
         private void OnDestroy()
         {
+            if (Instance == this)
+                Instance = null;
+
             StopSource();
             if (solidTexture != null)
                 Destroy(solidTexture);
+        }
+
+        /// <summary>Starts capture. Returns false when no device is available.</summary>
+        public bool TryStartLiveSource()
+        {
+            StartSource();
+            return source != null;
+        }
+
+        public void StopLiveSource()
+        {
+            StopSource();
         }
 
         private void RefreshDevices()
