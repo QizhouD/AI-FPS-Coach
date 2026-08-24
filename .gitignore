@@ -78,6 +78,11 @@ htmlcov/
 Thumbs.db
 Desktop.ini
 
+# Editor and play-mode captures: local verification artifacts, not project source.
+# The folder meta is ignored too, so a fresh clone has no meta for a missing folder.
+**/[Ss]creenshots/
+**/[Ss]creenshots.meta
+
 # Local match data and captured media
 /demo/
 *.dem
