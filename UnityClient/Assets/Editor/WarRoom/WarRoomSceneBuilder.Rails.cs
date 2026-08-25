@@ -128,7 +128,6 @@ namespace FpsAiCoach.Editor
             var rowGap = ui.U(rail.rowGap);
             var border = ui.U(0.012f);
             var indicator = ui.U(rail.rowIndicatorWidth);
-            var colliderDepth = ui.U(theme.Deck.buttonColliderDepth);
 
             for (var index = 0; index < entries.Length; index++)
             {
@@ -140,8 +139,7 @@ namespace FpsAiCoach.Editor
                     new Vector2(contentWidth, rowHeight),
                     entries[index],
                     border,
-                    indicator,
-                    colliderDepth);
+                    indicator);
             }
 
             BuildLibraryFooter(context, canvas, contentWidth);
@@ -188,7 +186,6 @@ namespace FpsAiCoach.Editor
             var buttonHeight = ui.U(rail.footerButtonHeight);
             var buttonGap = ui.U(rail.footerButtonGap);
             var border = ui.U(0.012f);
-            var colliderDepth = ui.U(theme.Deck.buttonColliderDepth);
 
             var statusY = bottom + ui.U(0.06f) + statusHeight * 0.5f;
             var buttonY = statusY + statusHeight * 0.5f + ui.U(0.04f) + buttonHeight * 0.5f;
@@ -209,7 +206,6 @@ namespace FpsAiCoach.Editor
                 ghostFill,
                 WarRoomColor.ForUi(palette.textPrimary),
                 border,
-                colliderDepth,
                 theme.Text.footerButtonLabel);
 
             // The sample report is a verification affordance, not a primary action, so it stays a
@@ -224,7 +220,6 @@ namespace FpsAiCoach.Editor
                 ghostFill,
                 WarRoomColor.ForUi(palette.textSecondary),
                 border,
-                colliderDepth,
                 theme.Text.footerButtonLabel);
 
             // Service error detail lands here, so the line wraps and shrinks instead of running past

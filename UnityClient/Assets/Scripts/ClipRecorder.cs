@@ -68,6 +68,7 @@ namespace FpsAiCoach
         private ClipMovieEncoder take;
         private Coroutine pump;
         private int segmentSerial;
+        private bool announcedCanSave;
 
         public bool IsRecordingTake => take != null;
 
@@ -301,6 +302,22 @@ namespace FpsAiCoach
                 segments[i].AddFrame(data, captureTime);
 
             RecycleAgedSegment(captureTime);
+            AnnounceSavability();
+        }
+
+        /// <summary>
+        /// Savability turns on when the first frame reaches a fresh segment, which is not a state
+        /// transition and so raises nothing on its own. Without this the HUD would latch SAVE CLIP
+        /// disabled from the moment buffering started and never re-enable it.
+        /// </summary>
+        private void AnnounceSavability()
+        {
+            var canSave = CanSaveClip;
+            if (canSave == announcedCanSave)
+                return;
+
+            announcedCanSave = canSave;
+            StateChanged?.Invoke();
         }
 
         // ------------------------------------------------------------------ rolling segments
@@ -503,6 +520,13 @@ namespace FpsAiCoach
         {
             State = state;
             StatusMessage = message ?? string.Empty;
+
+#if UNITY_EDITOR
+            // Recorded here too, so the frame-driven check does not raise a second event for a change
+            // this transition has already published.
+            announcedCanSave = CanSaveClip;
+#endif
+
             StateChanged?.Invoke();
         }
 

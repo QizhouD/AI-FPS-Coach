@@ -159,7 +159,6 @@ namespace FpsAiCoach.Editor
             var gap = ui.U(deck.buttonGap);
             var groupGap = ui.U(deck.buttonGroupGap);
             var border = ui.U(deck.buttonBorder);
-            var colliderDepth = ui.U(deck.buttonColliderDepth);
             var ghostFill = WarRoomColor.WithAlpha(WarRoomColor.ForUi(palette.panelGlass), 0.92f);
 
             // Slot centres are derived rather than authored, so the row stays centred and evenly
@@ -189,7 +188,6 @@ namespace FpsAiCoach.Editor
                 ghostFill,
                 WarRoomColor.ForUi(palette.textPrimary),
                 border,
-                colliderDepth,
                 autoSizeFloor: theme.Text.footerButtonLabel);
 
             // Primary action. An opaque dark-teal body with a full-strength cyan rim and label carries
@@ -209,7 +207,6 @@ namespace FpsAiCoach.Editor
                 primaryFill,
                 WarRoomColor.ForUi(palette.cyanPrimary),
                 border,
-                colliderDepth,
                 autoSizeFloor: theme.Text.footerButtonLabel);
 
             // Amber survives only on the label. Giving this button an orange border would put the
@@ -224,7 +221,6 @@ namespace FpsAiCoach.Editor
                 ghostFill,
                 WarRoomColor.ForUi(palette.amberAlert),
                 border,
-                colliderDepth,
                 autoSizeFloor: theme.Text.footerButtonLabel);
 
             // Capture group. Both stay muted ghosts: recording is a supporting action, and the deck
@@ -240,7 +236,6 @@ namespace FpsAiCoach.Editor
                 ghostFill,
                 WarRoomColor.ForUi(palette.textBright),
                 border,
-                colliderDepth,
                 autoSizeFloor: theme.Text.footerButtonLabel);
 
             context.SaveClipButton = ui.GhostButton(
@@ -253,7 +248,6 @@ namespace FpsAiCoach.Editor
                 ghostFill,
                 WarRoomColor.ForUi(palette.textSecondary),
                 border,
-                colliderDepth,
                 autoSizeFloor: theme.Text.footerButtonLabel);
 
             context.PlayButton.button.interactable = false;

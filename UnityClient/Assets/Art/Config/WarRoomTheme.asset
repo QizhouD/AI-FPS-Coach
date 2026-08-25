@@ -144,7 +144,6 @@ MonoBehaviour:
     buttonGroupGap: 0.46
     canvasSize: {x: 9.4, y: 0.86}
     buttonBorder: 0.018
-    buttonColliderDepth: 0.4
   capture:
     bufferOnStart: 1
     clipSeconds: 30

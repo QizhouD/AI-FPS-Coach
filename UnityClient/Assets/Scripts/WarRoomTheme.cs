@@ -306,9 +306,6 @@ namespace FpsAiCoach
 
             [Tooltip("Border thickness of ghost buttons, in metres.")]
             public float buttonBorder = 0.018f;
-
-            [Tooltip("Depth of the box collider that the world-space ray interactor hits.")]
-            public float buttonColliderDepth = 0.4f;
         }
 
         // ------------------------------------------------------------------ capture

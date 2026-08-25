@@ -32,6 +32,13 @@ namespace FpsAiCoach.Editor
 
         // ------------------------------------------------------------------ canvases
 
+        /// <summary>
+        /// A world-space canvas. Every one gets a <see cref="GraphicRaycaster"/>, including the purely
+        /// decorative ones: a raycaster only tests graphics whose <c>raycastTarget</c> is set, and only
+        /// buttons and list rows set it, so a canvas with nothing interactive costs nothing to raycast.
+        /// Adding it unconditionally means a control dropped onto any region works without a second
+        /// change here, which is the failure that made the whole deck inert.
+        /// </summary>
         public Canvas WorldCanvas(
             string name,
             Transform parent,
@@ -44,7 +51,8 @@ namespace FpsAiCoach.Editor
                 name,
                 typeof(RectTransform),
                 typeof(Canvas),
-                typeof(CanvasScaler));
+                typeof(CanvasScaler),
+                typeof(GraphicRaycaster));
             host.transform.SetParent(parent, false);
             host.transform.localPosition = localPosition;
             host.transform.localRotation = Quaternion.Euler(localEuler);
@@ -215,8 +223,7 @@ namespace FpsAiCoach.Editor
         // ------------------------------------------------------------------ interactive
 
         /// <summary>
-        /// Border-plus-fill button. The outer Image is the border, an inset child is the fill, and a
-        /// BoxCollider makes it reachable by the world-space ray interactor.
+        /// Border-plus-fill button. The outer Image is the border and an inset child is the fill.
         ///
         /// <paramref name="fillColor"/> must be effectively opaque: the border Image spans the whole
         /// rect, so a translucent fill lets the border colour bleed across the entire button instead of
@@ -232,16 +239,18 @@ namespace FpsAiCoach.Editor
             Color fillColor,
             Color textColor,
             float borderUnits,
-            float colliderDepthUnits,
             float? labelEmMeters = null,
             float? autoSizeFloor = null)
         {
             var rect = Rect(name, parent, center, size);
             var host = rect.gameObject;
 
+            // The border is the hit target because it spans the whole rect, so the rim is clickable
+            // too. It also lives on the same object as the Button, which is what the raycaster needs to
+            // find to deliver the click; the fill and the label stay non-interactive.
             var border = host.AddComponent<Image>();
             border.color = borderColor;
-            border.raycastTarget = false;
+            border.raycastTarget = true;
 
             var fill = Panel(
                 "Fill",
@@ -281,9 +290,6 @@ namespace FpsAiCoach.Editor
                 fadeDuration = 0.07f
             };
 
-            var collider = host.AddComponent<BoxCollider>();
-            collider.size = new Vector3(size.x, size.y, colliderDepthUnits);
-
             return new StudioHudController.DeckButton
             {
                 button = button,
@@ -304,14 +310,15 @@ namespace FpsAiCoach.Editor
             Vector2 size,
             WarRoomTheme.MatchEntry entry,
             float borderUnits,
-            float indicatorWidth,
-            float colliderDepthUnits)
+            float indicatorWidth)
         {
             var rect = Rect(name, parent, center, size);
             var host = rect.gameObject;
 
+            // Hit target for the whole row, for the same reason as on a button: it covers the full rect
+            // and sits on the object carrying the Button.
             var border = host.AddComponent<Image>();
-            border.raycastTarget = false;
+            border.raycastTarget = true;
 
             var background = Panel(
                 "Background",
@@ -389,9 +396,6 @@ namespace FpsAiCoach.Editor
                 colorMultiplier = 1f,
                 fadeDuration = 0.07f
             };
-
-            var collider = host.AddComponent<BoxCollider>();
-            collider.size = new Vector3(size.x, size.y, colliderDepthUnits);
 
             return new MatchLibraryController.Row
             {
