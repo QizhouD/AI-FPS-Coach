@@ -305,9 +305,15 @@ angle = atan(pixel_offset / f)
 ## 12. 未决问题
 
 1. CSGO 模型迁移到 CS2 的实际检出率——必须实测。
-2. `ultralytics 8.3+` 能否正常加载 `8.0.21` 训练的权重。
-3. `m` 模型在目标机 GPU 上单轮分析耗时（`FPS_VISION_DEVICE=cuda`，见 `AGENTS.md`）。
-   CPU 耗时仅作对照，不是验收环境。
-4. OBS 是否已安装，录制参数（分辨率、帧率、音频轨）如何配置。
-5. `CactusBooblegum` 数据集是否含头部类别。
-6. 靶场 demo 中 bot 是否带完整位置数据，以及录像帧与 demo tick 的对齐精度。
+2. OBS 是否已安装，录制参数（分辨率、帧率、音频轨）如何配置。
+3. `CactusBooblegum` 数据集是否含头部类别。
+4. 靶场 demo 中 bot 是否带完整位置数据，以及录像帧与 demo tick 的对齐精度。
+
+### 已确认（RTX 5070 Ti + torch 2.11.0+cu128 + ultralytics 8.4.128）
+
+- **旧权重可用**：`ultralytics 8.4.128` 能直接加载 `8.0.21` 训练的 `yolov8m-csgo`，
+  类别名为 `ct / cthead / t / thead`，与 `normalize_label()` 完全吻合，后端无需改代码。
+- **GPU 耗时不是瓶颈**：1080p 单帧稳定约 9 ms（首帧约 1.1 s 含预热）。
+  按 30 FPS 抽帧、60 秒单轮 = 1800 帧，纯推理约 16 秒，`sample_rate` 可以放心开到 30。
+- **Blackwell 需 cu128+**：`sm_120` 不在 cu124 及以下 wheel 的 arch 列表里。
+  `setup-vision.ps1` 结尾会真跑一次 GPU 矩阵乘来确认，而不是只看 `is_available()`。

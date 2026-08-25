@@ -11,6 +11,30 @@ $backendRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $backendRoot
 Set-Location -LiteralPath $backendRoot
 
+# pip and huggingface_hub write progress and advisory notices to stderr. Under
+# $ErrorActionPreference = "Stop" that alone aborts the script, so judge these
+# calls by their exit code instead.
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory = $true)][string]$Exe,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [string]$FailureMessage
+    )
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $Exe @Arguments 2>&1 | ForEach-Object { Write-Host $_ }
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    if ($LASTEXITCODE -ne 0) {
+        if ($FailureMessage) {
+            throw $FailureMessage
+        }
+        throw "$Exe exited with $LASTEXITCODE"
+    }
+}
+
 function Get-DriverCudaVersion {
     $smi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
     if (-not $smi) {
@@ -57,15 +81,15 @@ if (-not (Test-Path -LiteralPath $python)) {
 }
 
 Write-Host "Installing CUDA torch ($cudaTag) before requirements.txt ..."
-& $python -m pip install --upgrade pip
-& $python -m pip install --upgrade torch torchvision --index-url "https://download.pytorch.org/whl/$cudaTag"
-& $python -m pip install -r requirements.txt
+Invoke-Native $python @("-m", "pip", "install", "--upgrade", "pip")
+Invoke-Native $python @(
+    "-m", "pip", "install", "--upgrade", "torch", "torchvision",
+    "--index-url", "https://download.pytorch.org/whl/$cudaTag"
+) "CUDA torch install failed for index $cudaTag."
+Invoke-Native $python @("-m", "pip", "install", "-r", "requirements.txt")
 
-$cudaCheck = & $python -c "import torch; print('CUDA', torch.cuda.is_available()); print('DEVICE', torch.cuda.get_device_name(0) if torch.cuda.is_available() else '')" | Out-String
-Write-Host $cudaCheck.Trim()
-if ($cudaCheck -notmatch "CUDA True") {
-    throw "torch.cuda.is_available() is False. Stop here; do not start the API. Try another -CudaTag (cu124/cu121) matching nvidia-smi."
-}
+Invoke-Native $python @((Join-Path $backendRoot "tools\check_cuda.py")) `
+    "GPU check failed. Stop here; do not start the API. Pick a -CudaTag that targets this GPU (cu128 or newer for Blackwell / RTX 50 series)."
 
 $modelsDir = Join-Path $repoRoot "models"
 $mediaDir = Join-Path $repoRoot "media"
@@ -75,7 +99,10 @@ New-Item -ItemType Directory -Force -Path $mediaDir | Out-Null
 $modelPath = Join-Path $modelsDir "yolov8m-csgo.pt"
 if (-not $SkipModel -and -not (Test-Path -LiteralPath $modelPath)) {
     Write-Host "Downloading keremberke/yolov8m-csgo-player-detection -> $modelPath"
-    & $python (Join-Path $backendRoot "tools\download_enemy_model.py") --output $modelPath
+    Invoke-Native $python @(
+        (Join-Path $backendRoot "tools\download_enemy_model.py"),
+        "--output", $modelPath
+    ) "Model download failed. Fetch best.pt manually from https://huggingface.co/keremberke/yolov8m-csgo-player-detection"
     if (-not (Test-Path -LiteralPath $modelPath)) {
         throw "Model download finished but $modelPath is missing. Download best.pt manually from https://huggingface.co/keremberke/yolov8m-csgo-player-detection"
     }

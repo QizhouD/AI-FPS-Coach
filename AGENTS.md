@@ -38,15 +38,19 @@ powershell -ExecutionPolicy Bypass -File .\Backend\setup-vision.ps1
 
 脚本会：建 `.venv` → **先装 CUDA 版 torch** → 再装 `requirements.txt` → 下载 `yolov8m-csgo` 到 `models\yolov8m-csgo.pt` → 写根目录 `.env`（已 gitignore）。
 
-成功时终端应出现 `torch.cuda.is_available()=True` 和显卡名。`False` 就先别启动服务。
+结尾必须出现 `OK gpu compute verified`。这一步不只看 `torch.cuda.is_available()`——它会真的在 GPU 上做一次矩阵乘。只有 `is_available()=True` 不够：为旧架构编译的 wheel 能导入、能报出显卡，却在算子启动时报 `no kernel image is available`。
 
-驱动报 CUDA 12.1 时：
+CUDA tag 由驱动版本自动推断，也可以手动指定：
 
 ```powershell
-.\Backend\setup-vision.ps1 -CudaTag cu121
+.\Backend\setup-vision.ps1 -CudaTag cu128
 ```
 
-默认 `-CudaTag cu124`。不要把 `ultralytics` 写进「先于 torch」的 pip 命令。
+**RTX 50 系（Blackwell，`sm_120`）必须 cu128 或更高**，cu124 及以下装上也算不了。`check_cuda.py` 会打印 `capability` 和 wheel 的 `arch_list`，两者对不上就换 tag。
+
+不要把 `ultralytics` 写进「先于 torch」的 pip 命令。
+
+Python 若没装，用官方安装包装 3.10/3.11 即可；venv 固定在 `Backend\.venv`。
 
 ---
 
