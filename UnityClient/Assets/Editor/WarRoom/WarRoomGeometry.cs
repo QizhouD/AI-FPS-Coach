@@ -4,9 +4,9 @@ using UnityEngine;
 namespace FpsAiCoach.Editor
 {
     /// <summary>
-    /// Primitive helpers for the war room. Every primitive loses its collider on creation, because
-    /// <see cref="WorldButtonRayInteractor"/> uses a physics raycast and any stray collider on décor
-    /// would shadow the buttons behind it.
+    /// Primitive helpers for the war room. Every primitive loses its collider on creation: the set is
+    /// pure décor with no physics of its own, and UI input goes through the canvases' graphic raycaster
+    /// rather than a physics raycast, so a collider here would cost broadphase work and earn nothing.
     /// </summary>
     internal static class WarRoomGeometry
     {

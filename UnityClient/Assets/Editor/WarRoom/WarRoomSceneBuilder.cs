@@ -268,7 +268,6 @@ namespace FpsAiCoach.Editor
                 context.HeaderModeLabel,
                 context.HeaderMatchLabel);
 
-            root.AddComponent<WorldButtonRayInteractor>();
             root.AddComponent<VisionInferenceOverlay>();
 
             // The marker pool and the event dots stay hidden until a real report populates them.
