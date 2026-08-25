@@ -149,7 +149,7 @@ MonoBehaviour:
     clipSeconds: 30
     resolution: {x: 1920, y: 1080}
     frameRate: 30
-    outputDirectory: 
+    outputDirectory: ../genVedio
   typography:
     headerTitle: 0.3
     headerMeta: 0.15

@@ -85,6 +85,9 @@ Desktop.ini
 
 # Local match data and captured media
 /demo/
+# Where ClipRecorder writes clips, plus its rolling-buffer scratch segments. Listed as a folder as
+# well as by extension so the scratch subfolder never shows up as untracked either.
+/genVedio/
 *.dem
 *.mp4
 *.mov

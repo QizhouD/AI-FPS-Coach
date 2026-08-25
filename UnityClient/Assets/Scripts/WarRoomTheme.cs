@@ -338,11 +338,15 @@ namespace FpsAiCoach
 
             /// <summary>
             /// Empty means <c>persistentDataPath/Clips</c>. A relative path resolves against the Unity
-            /// project folder. Point this at the backend's FPS_VISION_MEDIA_ROOT when clips should be
-            /// analyzable by the vision service without being copied first.
+            /// project folder, so the default climbs one level to sit beside it in the repository root
+            /// rather than burying clips under AppData where they are awkward to find.
+            ///
+            /// It stays outside <c>Assets</c> deliberately: Unity would otherwise import every clip as a
+            /// project asset. Point this at the backend's FPS_VISION_MEDIA_ROOT instead when clips should
+            /// be analyzable by the vision service without being copied first.
             /// </summary>
             [Tooltip("Absolute or project-relative output folder. Empty uses persistentDataPath/Clips.")]
-            public string outputDirectory = "";
+            public string outputDirectory = "../genVedio";
         }
 
         // ------------------------------------------------------------------ typography
