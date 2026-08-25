@@ -3,5 +3,6 @@ demoparser2==0.41.4
 python-multipart==0.0.20
 uvicorn[standard]==0.34.2
 ultralytics>=8.3,<9
+huggingface_hub>=0.23,<1
 opencv-python>=4.10,<5
 onnxruntime>=1.18,<2

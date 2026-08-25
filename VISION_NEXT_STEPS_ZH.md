@@ -1,5 +1,9 @@
 # AI Coach 视觉模块下一步操作指南
 
+**GPU 游戏机（最终运行机）请先读仓库根目录 `AGENTS.md`，并用 `setup-vision.ps1` /
+`run-vision.ps1`。** 产品顺序以 `PRACTICE_REVIEW_DESIGN_ZH.md` 为准。本文第 3–5 节
+准心标注与训练在「训练后复盘」形态下 **不是 P0**。
+
 本文档针对当前 Unity 6 + FastAPI 视觉模块，按实际执行顺序说明下一步操作。
 
 ## 0. 先确认输入类型
@@ -22,6 +26,9 @@ D:\desktop\DQZ\AI-Coach-For-FPS\models\crosshair\weights\best.pt
 不要把模型权重或视频提交到 Git 仓库。
 
 ## 1. 安装 Python 视觉依赖
+
+**有 NVIDIA GPU 的运行机不要用本节的 `run.ps1` 做首次安装。** 改走仓库根目录
+`AGENTS.md`：`.\Backend\setup-vision.ps1`。
 
 打开 PowerShell，进入项目目录：
 

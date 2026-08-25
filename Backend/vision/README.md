@@ -12,9 +12,13 @@ Set these variables before starting the backend:
 $env:FPS_VISION_ENEMY_MODEL_PATH = "D:\models\cs2-yolov10s.pt"
 $env:FPS_VISION_CROSSHAIR_MODEL_PATH = "D:\models\crosshair\weights\best.pt"
 $env:FPS_VISION_CROSSHAIR_BASELINE = "true"
-$env:FPS_VISION_DEVICE = "cuda:0"
+$env:FPS_VISION_DEVICE = "cuda"
 $env:FPS_VISION_MEDIA_ROOT = "D:\desktop\DQZ\AI-Coach-For-FPS\media"
 ```
+
+On the GPU runtime machine prefer `Backend/run-vision.ps1` from the repo root
+(loads `.env`) instead of exporting these by hand. First-time CUDA install is
+`Backend/setup-vision.ps1`.
 
 The video job endpoint only accepts files below `FPS_VISION_MEDIA_ROOT`.
 When no crosshair model is configured, the default screen-center baseline

@@ -14,7 +14,12 @@ from app.main import analyze_demo_sample, analyze_frame, health
 
 class ContractTests(unittest.TestCase):
     def test_health(self) -> None:
-        self.assertEqual(health()["status"], "ok")
+        payload = health()
+        self.assertEqual(payload["status"], "ok")
+        self.assertIn("vision", payload)
+        self.assertIn("device", payload["vision"])
+        self.assertIn("enemy_model", payload["vision"])
+        self.assertIn("cuda_available", payload["vision"])
 
     def test_frame_analysis_contract(self) -> None:
         upload = UploadFile(filename="frame.jpg", file=io.BytesIO(b"fake-jpeg-smoke-test"))

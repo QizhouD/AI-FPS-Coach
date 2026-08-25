@@ -3,6 +3,11 @@
 The current development focus is offline CS2 demo analysis. The live coaching
 workflow remains available as a secondary workspace in the Unity client.
 
+**GPU gaming PC (the machine that should run the full stack):** after `git
+clone` / `git pull`, follow `AGENTS.md`. First-time vision setup is
+`.\Backend\setup-vision.ps1`, then `.\Backend\run-vision.ps1`. Do not run
+`.\Backend\run.ps1` before that on a CUDA machine.
+
 ## Requirements
 
 - Unity 6.2 (`6000.2.15f1`)
@@ -105,16 +110,18 @@ POST /api/v1/vision/video
 GET  /api/v1/vision/jobs/{job_id}
 ~~~
 
-Configure model paths before starting the backend:
+On the GPU gaming PC, configure via repo-root `.env` (see `.env.example`) and
+start with CUDA:
 
 ~~~powershell
-$env:FPS_VISION_ENEMY_MODEL_PATH = "D:\models\cs2-yolov10s.pt"
-$env:FPS_VISION_CROSSHAIR_MODEL_PATH = "D:\models\crosshair\weights\best.pt"
-$env:FPS_VISION_CROSSHAIR_BASELINE = "true"
-$env:FPS_VISION_MEDIA_ROOT = "D:\desktop\DQZ\AI-Coach-For-FPS\media"
-$env:FPS_VISION_DEVICE = "cpu"
-.\Backend\run.ps1
+.\Backend\setup-vision.ps1
+.\Backend\run-vision.ps1
 ~~~
+
+That writes `FPS_VISION_DEVICE=cuda`, downloads `models\yolov8m-csgo.pt`, and
+points `FPS_VISION_MEDIA_ROOT` at `media\`. Unity still calls
+`http://127.0.0.1:8000`. Check `GET /health` for `vision.cuda_available` and
+`vision.enemy_model`.
 
 The Unity client samples its VideoPlayer RenderTexture and draws the
 inference overlay on the video surface. Without model paths, the API remains
@@ -124,8 +131,9 @@ Training, frame sampling, and PyTorch/ONNX comparison helpers are under
 Backend/tools. See `Backend/vision/README.md` for the full crosshair dataset
 workflow.
 
-For the complete Chinese execution checklist, see
-`VISION_NEXT_STEPS_ZH.md`.
+Agent onboarding for the GPU runtime machine is `AGENTS.md`. Product order is
+`PRACTICE_REVIEW_DESIGN_ZH.md`. The older visual checklist is
+`VISION_NEXT_STEPS_ZH.md` (crosshair training is not required for P0).
 
 ## Next Analysis Milestones
 

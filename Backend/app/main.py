@@ -163,9 +163,35 @@ TIPS = (
 )
 
 
+def _cuda_status() -> tuple[bool, str | None]:
+    try:
+        import torch
+    except ImportError:
+        return False, None
+    if not torch.cuda.is_available():
+        return False, None
+    try:
+        return True, torch.cuda.get_device_name(0)
+    except Exception:
+        return True, None
+
+
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "service": "fps-ai-coach-live"}
+def health() -> dict:
+    cuda_available, cuda_name = _cuda_status()
+    return {
+        "status": "ok",
+        "service": "fps-ai-coach-live",
+        "vision": {
+            "device": vision_engine.device,
+            "cuda_available": cuda_available,
+            "cuda_name": cuda_name,
+            "enemy_model": vision_engine.enemy_detector.status,
+            "crosshair_model": vision_engine.crosshair_detector.status,
+            "crosshair_baseline": vision_engine.crosshair_baseline,
+            "media_root": str(vision_jobs.media_root),
+        },
+    }
 
 
 @app.post("/api/v1/analyze/frame", response_model=AnalysisResponse)
