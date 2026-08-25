@@ -77,7 +77,12 @@ namespace FpsAiCoach
             selectedScoreText = rowSelectedScoreText;
         }
 
-        private void Start()
+        /// <summary>
+        /// On enable rather than in Start so the row listeners come back after a domain reload, which drops
+        /// them and never calls Start again. <see cref="OnDisable"/> clears them, so the pairing also keeps
+        /// a second enable from stacking a duplicate listener on every row.
+        /// </summary>
+        private void OnEnable()
         {
             for (var index = 0; index < rows.Length; index++)
             {
@@ -89,7 +94,7 @@ namespace FpsAiCoach
             Refresh();
         }
 
-        private void OnDestroy()
+        private void OnDisable()
         {
             foreach (var row in rows)
             {

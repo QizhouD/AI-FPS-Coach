@@ -63,17 +63,29 @@ namespace FpsAiCoach
             sourceTexture = videoPlayer.targetTexture;
             CreateOverlay();
             nextSampleTime = 0f;
+        }
 
+        /// <summary>
+        /// Only the subscription moves to enable, so that it survives the domain reload a script edit during
+        /// play causes. Building the overlay stays in Start deliberately: it spawns objects, so running it
+        /// per enable would stack a second set on top of the first.
+        /// </summary>
+        private void OnEnable()
+        {
             var screen = GetComponent<TacticalScreenController>();
             if (screen != null)
                 screen.VideoPathLoaded += HandleVideoPathLoaded;
         }
 
-        private void OnDestroy()
+        private void OnDisable()
         {
             var screen = GetComponent<TacticalScreenController>();
             if (screen != null)
                 screen.VideoPathLoaded -= HandleVideoPathLoaded;
+        }
+
+        private void OnDestroy()
+        {
             if (whiteTexture != null)
                 Destroy(whiteTexture);
             if (lineMaterial != null)

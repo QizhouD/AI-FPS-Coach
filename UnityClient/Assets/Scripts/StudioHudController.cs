@@ -106,7 +106,18 @@ namespace FpsAiCoach
             headerMatchLabel = match;
         }
 
-        private void Start()
+        /// <summary>
+        /// Wiring lives on enable rather than in Start so that it is restored after a domain reload, which
+        /// any script edit during play triggers. Neither runtime <c>AddListener</c> calls nor C# delegates
+        /// survive one, and Start never runs again, so the whole HUD used to come back inert: buttons dead,
+        /// status lines frozen on whatever they last displayed.
+        ///
+        /// Everything below is either a subscription undone in <see cref="OnDisable"/> or an idempotent
+        /// state sync, so repeating it on each enable is harmless. The trailing syncs also make this
+        /// independent of initialisation order: whichever controller comes up second announces itself
+        /// through its own event, and the subscription is already in place to hear it.
+        /// </summary>
+        private void OnEnable()
         {
             if (importButton?.button != null)
                 importButton.button.onClick.AddListener(HandleImportClicked);
@@ -148,7 +159,7 @@ namespace FpsAiCoach
             timeline?.SetProgress(0f);
         }
 
-        private void OnDestroy()
+        private void OnDisable()
         {
             if (importButton?.button != null)
                 importButton.button.onClick.RemoveListener(HandleImportClicked);

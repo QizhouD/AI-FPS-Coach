@@ -90,15 +90,34 @@ namespace FpsAiCoach
             SetState(TacticalScreenState.Idle, string.Empty);
         }
 
+        /// <summary>
+        /// The player's callbacks are subscribed here rather than alongside the rest of its setup because
+        /// a domain reload — which any script edit during play triggers — drops C# delegates while leaving
+        /// the component itself alive, and Awake does not run a second time. Subscribing on enable instead
+        /// keeps playback from going deaf to its own prepare and error notifications.
+        /// </summary>
+        private void OnEnable()
+        {
+            if (videoPlayer == null)
+                return;
+
+            videoPlayer.prepareCompleted += HandlePrepared;
+            videoPlayer.errorReceived += HandleError;
+            videoPlayer.loopPointReached += HandleFinished;
+        }
+
+        private void OnDisable()
+        {
+            if (videoPlayer == null)
+                return;
+
+            videoPlayer.prepareCompleted -= HandlePrepared;
+            videoPlayer.errorReceived -= HandleError;
+            videoPlayer.loopPointReached -= HandleFinished;
+        }
+
         private void OnDestroy()
         {
-            if (videoPlayer != null)
-            {
-                videoPlayer.prepareCompleted -= HandlePrepared;
-                videoPlayer.errorReceived -= HandleError;
-                videoPlayer.loopPointReached -= HandleFinished;
-            }
-
             if (videoTexture != null)
             {
                 videoTexture.Release();
@@ -133,9 +152,6 @@ namespace FpsAiCoach
             videoPlayer.renderMode = VideoRenderMode.RenderTexture;
             videoPlayer.targetTexture = videoTexture;
             videoPlayer.audioOutputMode = VideoAudioOutputMode.Direct;
-            videoPlayer.prepareCompleted += HandlePrepared;
-            videoPlayer.errorReceived += HandleError;
-            videoPlayer.loopPointReached += HandleFinished;
         }
 
         private void CreateSurfaceMaterial()

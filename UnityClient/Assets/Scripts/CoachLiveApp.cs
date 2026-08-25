@@ -81,18 +81,30 @@ namespace FpsAiCoach
 
         private void Awake()
         {
-            Instance = this;
             Application.runInBackground = true;
             endpoint = PlayerPrefs.GetString(EndpointKey, endpoint);
             demoMode = PlayerPrefs.GetInt(DemoModeKey, 1) == 1;
             RefreshDevices();
         }
 
-        private void OnDestroy()
+        /// <summary>
+        /// The singleton is republished here rather than in Awake because a domain reload clears static
+        /// fields while leaving this object alive, and Awake does not run again. Callers reaching for
+        /// <see cref="Instance"/> would otherwise find null for the rest of the session.
+        /// </summary>
+        private void OnEnable()
+        {
+            Instance = this;
+        }
+
+        private void OnDisable()
         {
             if (Instance == this)
                 Instance = null;
+        }
 
+        private void OnDestroy()
+        {
             StopSource();
             if (solidTexture != null)
                 Destroy(solidTexture);

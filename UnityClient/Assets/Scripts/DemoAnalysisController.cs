@@ -52,7 +52,12 @@ namespace FpsAiCoach
             theme = configuredTheme;
         }
 
-        private void Start()
+        /// <summary>
+        /// On enable so the status line is republished after a domain reload, which resets these properties
+        /// without calling Start again. The guard keeps an in-flight analysis from being reset back to idle
+        /// if the component is toggled while it is working.
+        /// </summary>
+        private void OnEnable()
         {
             if (State == DemoAnalysisState.Idle && string.IsNullOrEmpty(StatusMessage))
                 SetState(DemoAnalysisState.Idle, Copy.demoStatusIdle);
