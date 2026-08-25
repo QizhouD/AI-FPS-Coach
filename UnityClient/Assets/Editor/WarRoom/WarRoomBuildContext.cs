@@ -44,5 +44,12 @@ namespace FpsAiCoach.Editor
         public StudioHudController.DeckButton ImportButton;
         public StudioHudController.DeckButton PlayButton;
         public StudioHudController.DeckButton LiveButton;
+
+        // Control deck, capture group
+        public StudioHudController.DeckButton RecordButton;
+        public StudioHudController.DeckButton SaveClipButton;
+
+        /// <summary>Lives on the screen-space chrome rather than the deck, which has no room for it.</summary>
+        public TMP_Text CaptureStatusLabel;
     }
 }

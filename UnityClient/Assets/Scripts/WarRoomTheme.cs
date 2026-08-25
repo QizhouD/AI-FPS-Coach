@@ -22,6 +22,7 @@ namespace FpsAiCoach
         [SerializeField] private SideRail rail = new SideRail();
         [SerializeField] private HeaderBand header = new HeaderBand();
         [SerializeField] private ControlDeck deck = new ControlDeck();
+        [SerializeField] private Capture capture = new Capture();
         [SerializeField] private Typography typography = new Typography();
         [SerializeField] private CanvasMetrics canvas = new CanvasMetrics();
         [SerializeField] private LightingRig lighting = new LightingRig();
@@ -34,6 +35,7 @@ namespace FpsAiCoach
         public SideRail Rail => rail;
         public HeaderBand Header => header;
         public ControlDeck Deck => deck;
+        public Capture Recording => capture;
         public Typography Text => typography;
         public CanvasMetrics Canvas => canvas;
         public LightingRig Lights => lighting;
@@ -287,8 +289,19 @@ namespace FpsAiCoach
 
             public float buttonRowY = 1.24f;
             public float buttonRowZ = 2.42f;
-            public Vector2 buttonSize = new Vector2(2.3f, 0.5f);
-            public float buttonSpacing = 2.9f;
+
+            /// <summary>
+            /// Narrowed from 2.3 when the deck grew from three buttons to five. Five buttons of the
+            /// old width span 13 m, well past both the deck slab and the camera frustum.
+            /// </summary>
+            public Vector2 buttonSize = new Vector2(1.56f, 0.5f);
+
+            [Tooltip("Gap between buttons that belong to the same group.")]
+            public float buttonGap = 0.18f;
+
+            [Tooltip("Wider gap separating the playback group from the capture group.")]
+            public float buttonGroupGap = 0.46f;
+
             public Vector2 canvasSize = new Vector2(9.4f, 0.86f);
 
             [Tooltip("Border thickness of ghost buttons, in metres.")]
@@ -296,6 +309,78 @@ namespace FpsAiCoach
 
             [Tooltip("Depth of the box collider that the world-space ray interactor hits.")]
             public float buttonColliderDepth = 0.4f;
+        }
+
+        // ------------------------------------------------------------------ capture
+
+        /// <summary>
+        /// Video capture of the war-room camera, encoded to H.264 by InstantReplay (Media Foundation
+        /// on Windows). Read by <see cref="ClipRecorder"/>.
+        /// </summary>
+        [Serializable]
+        public sealed class Capture
+        {
+            [Tooltip("Arm the rolling buffer as soon as the scene starts, so a clip is always savable.")]
+            public bool bufferOnStart = true;
+
+            [Tooltip("Length of the tail written by SAVE CLIP, in seconds.")]
+            public int clipSeconds = 30;
+
+            /// <summary>
+            /// The whole war-room view is encoded, and the tactical screen occupies roughly 60% of its
+            /// width, so 1080p leaves about 1150 px of actual game footage. Dropping to 720p leaves
+            /// about 770 px, which starts to cost detail when reviewing crosshair placement.
+            /// </summary>
+            public Vector2Int resolution = new Vector2Int(1920, 1080);
+
+            public int frameRate = 30;
+
+            /// <summary>
+            /// Off re-renders the camera off-screen, which covers the 3D set and every world-space
+            /// canvas but not screen-space overlay chrome. On records the presented frame instead, so it
+            /// also catches the corner brackets and the status strip — but it captures nothing while the
+            /// editor is not drawing the Game view, so keep it off outside a player build.
+            /// </summary>
+            [Tooltip("Record the composited screen instead of the camera. Player builds only.")]
+            public bool captureFullScreen = false;
+
+            /// <summary>
+            /// The encoder always declares an audio track next to the video one, and a declared track
+            /// that never receives a sample makes the muxer fail to close the file. Capturing the
+            /// AudioListener keeps the track valid; the war room is near-silent, so this costs a
+            /// near-empty AAC stream rather than anything meaningful.
+            /// </summary>
+            [Tooltip("Capture the AudioListener. Disabling this can make the muxer fail to close the file.")]
+            public bool captureAudio = true;
+
+            /// <summary>
+            /// The encoder's fast path hands the GPU texture straight to the native encoder, which
+            /// requires a render-thread plugin event to be flushed. In the editor those events are not
+            /// reliably flushed for a camera rendered on demand, and the symptom is a video track that
+            /// stays empty while audio keeps filling — which then makes the muxer refuse to close the
+            /// file. Reading the frame back to the CPU first costs bandwidth but always produces frames.
+            /// </summary>
+            [Tooltip("Read frames back to the CPU instead of handing textures to the encoder directly.")]
+            public bool forceReadback = true;
+
+            [Tooltip("Target video bitrate in kbps.")]
+            public int bitrateKbps = 6000;
+
+            /// <summary>
+            /// Ceiling on buffered compressed frames, which is what actually bounds the rolling
+            /// window. At 6000 kbps, 30 s is roughly 22 MB, so this leaves headroom for the encoder to
+            /// overshoot on busy scenes rather than discarding the start of the clip.
+            /// </summary>
+            [Tooltip("Memory ceiling for the rolling buffer, in MB.")]
+            public int bufferMegabytes = 64;
+
+            /// <summary>
+            /// Empty means <c>persistentDataPath/Clips</c>. A relative path resolves against the Unity
+            /// project folder. Point this at the backend's FPS_VISION_MEDIA_ROOT when clips should be
+            /// analyzable by the vision service without being copied first.
+            /// </summary>
+            [Tooltip("Absolute or project-relative output folder. Empty uses persistentDataPath/Clips.")]
+            public string outputDirectory = "";
         }
 
         // ------------------------------------------------------------------ typography
@@ -478,6 +563,25 @@ namespace FpsAiCoach
             public string buttonPause = "PAUSE";
             public string buttonLive = "LIVE MODE";
             public string buttonDemo = "DEMO MODE";
+
+            [Header("Capture (war-room camera to MP4)")]
+            public string buttonRecord = "RECORD";
+
+            [Tooltip("Same button as buttonRecord, shown while a take is running.")]
+            public string buttonRecordStop = "STOP REC";
+
+            public string buttonSaveClip = "SAVE CLIP";
+
+            public string captureStatusIdle = "CAPTURE OFF";
+            public string captureStatusBuffering = "BUFFERING LAST {0}s  ·  SAVE CLIP TO KEEP";
+            public string captureStatusRecording = "RECORDING  ·  {0}";
+            public string captureStatusSaving = "WRITING VIDEO";
+            public string captureStatusSaved = "SAVED  ·  {0}";
+            public string captureStatusFailed = "CAPTURE FAILED  ·  {0}";
+            public string captureStatusUnavailable = "CAPTURE UNAVAILABLE  ·  {0}";
+
+            [Tooltip("Shown when the encoder received no frames, usually a hidden Game view in the editor.")]
+            public string captureStatusNoFrames = "NO FRAMES CAPTURED  ·  KEEP THE GAME VIEW VISIBLE";
 
             [Header("Demo analysis (CS2 .dem via the local service)")]
             public string buttonImportDemo = "IMPORT DEMO";

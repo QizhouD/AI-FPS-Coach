@@ -32,11 +32,14 @@ namespace FpsAiCoach
         [SerializeField] private MatchLibraryController library;
         [SerializeField] private InsightsController insights;
         [SerializeField] private DemoAnalysisController demoAnalysis;
+        [SerializeField] private ClipRecorder recorder;
 
         [Header("Deck buttons")]
         [SerializeField] private DeckButton importButton = new DeckButton();
         [SerializeField] private DeckButton playButton = new DeckButton();
         [SerializeField] private DeckButton liveButton = new DeckButton();
+        [SerializeField] private DeckButton recordButton = new DeckButton();
+        [SerializeField] private DeckButton saveClipButton = new DeckButton();
 
         [Header("Library footer buttons")]
         [SerializeField] private DeckButton importDemoButton = new DeckButton();
@@ -48,6 +51,7 @@ namespace FpsAiCoach
         [SerializeField] private TMP_Text headerModeLabel;
         [SerializeField] private TMP_Text headerMatchLabel;
         [SerializeField] private TMP_Text demoStatusLabel;
+        [SerializeField] private TMP_Text captureStatusLabel;
 
         private int lastImportFrame = -1;
         private int lastDemoFrame = -1;
@@ -60,7 +64,8 @@ namespace FpsAiCoach
             StudioAnimator configuredAnimator,
             MatchLibraryController configuredLibrary,
             InsightsController configuredInsights,
-            DemoAnalysisController configuredDemoAnalysis)
+            DemoAnalysisController configuredDemoAnalysis,
+            ClipRecorder configuredRecorder)
         {
             theme = configuredTheme;
             screen = configuredScreen;
@@ -69,6 +74,7 @@ namespace FpsAiCoach
             library = configuredLibrary;
             insights = configuredInsights;
             demoAnalysis = configuredDemoAnalysis;
+            recorder = configuredRecorder;
         }
 
         public void BindButtons(DeckButton import, DeckButton play, DeckButton live)
@@ -76,6 +82,13 @@ namespace FpsAiCoach
             importButton = import;
             playButton = play;
             liveButton = live;
+        }
+
+        public void BindCapture(DeckButton record, DeckButton saveClip, TMP_Text status)
+        {
+            recordButton = record;
+            saveClipButton = saveClip;
+            captureStatusLabel = status;
         }
 
         public void BindLibraryFooter(DeckButton importDemo, DeckButton sample, TMP_Text status)
@@ -105,6 +118,10 @@ namespace FpsAiCoach
                 importDemoButton.button.onClick.AddListener(HandleImportDemoClicked);
             if (sampleButton?.button != null)
                 sampleButton.button.onClick.AddListener(HandleSampleClicked);
+            if (recordButton?.button != null)
+                recordButton.button.onClick.AddListener(HandleRecordClicked);
+            if (saveClipButton?.button != null)
+                saveClipButton.button.onClick.AddListener(HandleSaveClipClicked);
 
             if (screen != null)
                 screen.StateChanged += HandleScreenStateChanged;
@@ -115,6 +132,9 @@ namespace FpsAiCoach
                 demoAnalysis.ReportLoaded += HandleReportLoaded;
             }
 
+            if (recorder != null)
+                recorder.StateChanged += HandleCaptureStateChanged;
+
             if (library != null)
             {
                 library.SelectionChanged += HandleMatchSelected;
@@ -124,6 +144,7 @@ namespace FpsAiCoach
             ApplyInsightContent();
             HandleScreenStateChanged();
             HandleDemoStateChanged();
+            HandleCaptureStateChanged();
             timeline?.SetProgress(0f);
         }
 
@@ -139,6 +160,10 @@ namespace FpsAiCoach
                 importDemoButton.button.onClick.RemoveListener(HandleImportDemoClicked);
             if (sampleButton?.button != null)
                 sampleButton.button.onClick.RemoveListener(HandleSampleClicked);
+            if (recordButton?.button != null)
+                recordButton.button.onClick.RemoveListener(HandleRecordClicked);
+            if (saveClipButton?.button != null)
+                saveClipButton.button.onClick.RemoveListener(HandleSaveClipClicked);
 
             if (screen != null)
                 screen.StateChanged -= HandleScreenStateChanged;
@@ -148,6 +173,9 @@ namespace FpsAiCoach
                 demoAnalysis.StateChanged -= HandleDemoStateChanged;
                 demoAnalysis.ReportLoaded -= HandleReportLoaded;
             }
+
+            if (recorder != null)
+                recorder.StateChanged -= HandleCaptureStateChanged;
 
             if (library != null)
                 library.SelectionChanged -= HandleMatchSelected;
@@ -236,6 +264,16 @@ namespace FpsAiCoach
             demoAnalysis?.LoadSample();
         }
 
+        private void HandleRecordClicked()
+        {
+            recorder?.ToggleTake();
+        }
+
+        private void HandleSaveClipClicked()
+        {
+            recorder?.SaveClip();
+        }
+
         private void HandleMatchSelected(int index)
         {
             if (headerMatchLabel == null || library == null)
@@ -269,6 +307,43 @@ namespace FpsAiCoach
             var idle = !demoAnalysis.IsBusy;
             SetInteractable(importDemoButton, idle);
             SetInteractable(sampleButton, idle);
+        }
+
+        // ------------------------------------------------------------------ capture
+
+        /// <summary>
+        /// Mirrors the recorder onto the chrome. RECORD doubles as STOP once a take is running, so the
+        /// deck does not need a sixth button for an action that only exists in one state.
+        /// </summary>
+        private void HandleCaptureStateChanged()
+        {
+            if (recorder == null || theme == null)
+                return;
+
+            SetLabel(captureStatusLabel, recorder.StatusMessage);
+
+            if (captureStatusLabel != null)
+            {
+                var palette = theme.Colors;
+                captureStatusLabel.color = recorder.State switch
+                {
+                    ClipRecorderState.Recording => WarRoomColor.ForUi(palette.amberAlert),
+                    ClipRecorderState.Saved => WarRoomColor.ForUi(palette.cyanPrimary),
+                    ClipRecorderState.Failed => WarRoomColor.ForUi(palette.amberAlert),
+                    _ => WarRoomColor.ForUi(palette.textMuted)
+                };
+            }
+
+            SetLabel(
+                recordButton?.label,
+                recorder.IsRecordingTake
+                    ? theme.Data.buttonRecordStop
+                    : theme.Data.buttonRecord);
+
+            // Muxing owns the encoder, so neither action may start until it finishes. Saving a clip
+            // additionally needs a live buffer, which a running take deliberately does not keep.
+            SetInteractable(recordButton, !recorder.IsBusy);
+            SetInteractable(saveClipButton, recorder.CanSaveClip);
         }
 
         /// <summary>

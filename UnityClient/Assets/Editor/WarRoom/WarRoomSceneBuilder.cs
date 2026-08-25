@@ -240,6 +240,9 @@ namespace FpsAiCoach.Editor
             var demo = root.AddComponent<DemoAnalysisController>();
             demo.Configure(theme);
 
+            var recorder = root.AddComponent<ClipRecorder>();
+            recorder.Configure(theme, context.Camera);
+
             var hud = root.AddComponent<StudioHudController>();
             hud.Configure(
                 theme,
@@ -248,8 +251,13 @@ namespace FpsAiCoach.Editor
                 animator,
                 context.Library,
                 context.Insights,
-                demo);
+                demo,
+                recorder);
             hud.BindButtons(context.ImportButton, context.PlayButton, context.LiveButton);
+            hud.BindCapture(
+                context.RecordButton,
+                context.SaveClipButton,
+                context.CaptureStatusLabel);
             hud.BindLibraryFooter(
                 context.ImportDemoButton,
                 context.SampleButton,

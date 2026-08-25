@@ -233,7 +233,8 @@ namespace FpsAiCoach.Editor
             Color textColor,
             float borderUnits,
             float colliderDepthUnits,
-            float? labelEmMeters = null)
+            float? labelEmMeters = null,
+            float? autoSizeFloor = null)
         {
             var rect = Rect(name, parent, center, size);
             var host = rect.gameObject;
@@ -259,7 +260,9 @@ namespace FpsAiCoach.Editor
                 textColor,
                 TextAlignmentOptions.Center,
                 theme.Text.trackingLabel,
-                FontStyles.Bold);
+                FontStyles.Bold,
+                wrap: false,
+                autoSizeFloor: autoSizeFloor);
 
             var button = host.AddComponent<Button>();
             button.targetGraphic = fill;

@@ -112,8 +112,10 @@ namespace FpsAiCoach.Editor
         }
 
         /// <summary>
-        /// Control deck: a tilted console slab with all three buttons on a single canvas. Play is the
-        /// only filled button; the others are ghosts, with amber reserved for the live action.
+        /// Control deck: a tilted console slab carrying every button on a single canvas, in two groups
+        /// separated by a wider gap. The left group chooses what the tactical screen shows; the right
+        /// group captures it. Play is the only filled button; the others are ghosts, with amber
+        /// reserved for the live action.
         /// </summary>
         private static void BuildControlDeck(WarRoomBuildContext context)
         {
@@ -154,22 +156,41 @@ namespace FpsAiCoach.Editor
                 theme.Canvas.sortingOrderDeck);
 
             var size = ui.U(deck.buttonSize);
-            var spacing = ui.U(deck.buttonSpacing);
+            var gap = ui.U(deck.buttonGap);
+            var groupGap = ui.U(deck.buttonGroupGap);
             var border = ui.U(deck.buttonBorder);
             var colliderDepth = ui.U(deck.buttonColliderDepth);
             var ghostFill = WarRoomColor.WithAlpha(WarRoomColor.ForUi(palette.panelGlass), 0.92f);
 
+            // Slot centres are derived rather than authored, so the row stays centred and evenly
+            // spaced no matter how the widths and gaps are retuned. Index 3 opens the capture group.
+            const int slots = 5;
+            const int captureGroupStart = 3;
+            var span = size.x * slots + gap * (slots - 2) + groupGap;
+            var slotX = new float[slots];
+            var cursor = -span * 0.5f;
+
+            for (var slot = 0; slot < slots; slot++)
+            {
+                if (slot > 0)
+                    cursor += slot == captureGroupStart ? groupGap : gap;
+
+                slotX[slot] = cursor + size.x * 0.5f;
+                cursor += size.x;
+            }
+
             context.ImportButton = ui.GhostButton(
                 "IMPORT VIDEO Button",
                 canvas.transform,
-                new Vector2(-spacing, 0f),
+                new Vector2(slotX[0], 0f),
                 size,
                 theme.Data.buttonImport,
                 WarRoomColor.WithAlpha(WarRoomColor.ForUi(palette.cyanDim), 0.9f),
                 ghostFill,
                 WarRoomColor.ForUi(palette.textPrimary),
                 border,
-                colliderDepth);
+                colliderDepth,
+                autoSizeFloor: theme.Text.footerButtonLabel);
 
             // Primary action. An opaque dark-teal body with a full-strength cyan rim and label carries
             // the hierarchy; a solid cyan block would out-shout the tactical screen behind it.
@@ -181,28 +202,59 @@ namespace FpsAiCoach.Editor
             context.PlayButton = ui.GhostButton(
                 "PLAY Button",
                 canvas.transform,
-                Vector2.zero,
+                new Vector2(slotX[1], 0f),
                 size,
                 theme.Data.buttonPlay,
                 WarRoomColor.ForUi(palette.cyanPrimary),
                 primaryFill,
                 WarRoomColor.ForUi(palette.cyanPrimary),
                 border,
-                colliderDepth);
+                colliderDepth,
+                autoSizeFloor: theme.Text.footerButtonLabel);
 
             // Amber survives only on the label. Giving this button an orange border would put the
             // priority colour in two unrelated places and dilute what it signals on the insight cards.
             context.LiveButton = ui.GhostButton(
                 "LIVE MODE Button",
                 canvas.transform,
-                new Vector2(spacing, 0f),
+                new Vector2(slotX[2], 0f),
                 size,
                 theme.Data.buttonLive,
                 WarRoomColor.WithAlpha(WarRoomColor.ForUi(palette.cyanDim), 0.9f),
                 ghostFill,
                 WarRoomColor.ForUi(palette.amberAlert),
                 border,
-                colliderDepth);
+                colliderDepth,
+                autoSizeFloor: theme.Text.footerButtonLabel);
+
+            // Capture group. Both stay muted ghosts: recording is a supporting action, and the deck
+            // already spends its one strong accent on PLAY. The recording state is carried by the
+            // status line and the label swap, not by a colour that competes with the screen.
+            context.RecordButton = ui.GhostButton(
+                "RECORD Button",
+                canvas.transform,
+                new Vector2(slotX[3], 0f),
+                size,
+                theme.Data.buttonRecord,
+                WarRoomColor.WithAlpha(WarRoomColor.ForUi(palette.panelEdge), 0.95f),
+                ghostFill,
+                WarRoomColor.ForUi(palette.textBright),
+                border,
+                colliderDepth,
+                autoSizeFloor: theme.Text.footerButtonLabel);
+
+            context.SaveClipButton = ui.GhostButton(
+                "SAVE CLIP Button",
+                canvas.transform,
+                new Vector2(slotX[4], 0f),
+                size,
+                theme.Data.buttonSaveClip,
+                WarRoomColor.WithAlpha(WarRoomColor.ForUi(palette.panelEdge), 0.95f),
+                ghostFill,
+                WarRoomColor.ForUi(palette.textSecondary),
+                border,
+                colliderDepth,
+                autoSizeFloor: theme.Text.footerButtonLabel);
 
             context.PlayButton.button.interactable = false;
         }
@@ -271,12 +323,15 @@ namespace FpsAiCoach.Editor
                 wrap: false,
                 fontSizeOverride: 18f);
 
-            ui.Label(
-                "Interaction Hint",
+            // Capture state lives here rather than on the deck: the deck canvas is only 0.86 m tall and
+            // its buttons already fill it, while this strip is pixel-crisp and otherwise empty. It
+            // replaces a static usage hint, which carried less information than a live readout.
+            context.CaptureStatusLabel = ui.Label(
+                "Capture Status",
                 canvas.transform,
                 new Vector2(halfX - margin - 500f, -halfY + 54f),
                 new Vector2(1000f, 44f),
-                "CLICK TO SELECT  ·  IMPORT A CLIP TO BEGIN REVIEW",
+                theme.Data.captureStatusIdle,
                 0f,
                 WarRoomColor.ForUi(palette.textMuted),
                 TextAlignmentOptions.Right,
