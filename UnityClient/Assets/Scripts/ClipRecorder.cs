@@ -88,7 +88,13 @@ namespace FpsAiCoach
 
         // ------------------------------------------------------------------ lifecycle
 
-        private void Start()
+        /// <summary>
+        /// Arming lives here rather than in Start so that it is symmetric with <see cref="OnDisable"/>,
+        /// which tears the encoder and the buffer down. Editing any script during play triggers a domain
+        /// reload, and that calls OnDisable without ever calling Start again — the recorder would then sit
+        /// there reporting BUFFERING with no capture running and silently refuse to save.
+        /// </summary>
+        private void OnEnable()
         {
 #if UNITY_EDITOR
             if (Settings.bufferOnStart)
