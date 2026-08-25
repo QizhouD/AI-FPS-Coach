@@ -150,8 +150,6 @@ MonoBehaviour:
     clipSeconds: 30
     resolution: {x: 1920, y: 1080}
     frameRate: 30
-    bitrateKbps: 6000
-    bufferMegabytes: 64
     outputDirectory: 
   typography:
     headerTitle: 0.3
@@ -257,6 +255,7 @@ MonoBehaviour:
     captureStatusSaved: "SAVED  \xB7  {0}"
     captureStatusFailed: "CAPTURE FAILED  \xB7  {0}"
     captureStatusUnavailable: "CAPTURE UNAVAILABLE  \xB7  {0}"
+    captureStatusNoFrames: NO FRAMES CAPTURED
     buttonImportDemo: IMPORT DEMO
     buttonSampleReport: SAMPLE
     demoEndpoint: http://127.0.0.1:8000/api/v1/analyze/demo

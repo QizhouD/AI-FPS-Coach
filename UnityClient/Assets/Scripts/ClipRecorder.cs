@@ -1,8 +1,8 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
-using System.Threading.Tasks;
-using InstantReplay;
-using UniEnc;
+using Unity.Collections;
 using UnityEngine;
 
 namespace FpsAiCoach
@@ -12,13 +12,13 @@ namespace FpsAiCoach
         /// <summary>Nothing is encoding.</summary>
         Idle,
 
-        /// <summary>The rolling buffer is live, so the last N seconds can be saved at any moment.</summary>
+        /// <summary>The rolling buffer is live, so the recent past can be saved at any moment.</summary>
         Buffering,
 
         /// <summary>A full-length take is being written straight to disk.</summary>
         Recording,
 
-        /// <summary>Muxing. The encoders are stopped but the file is not closed yet.</summary>
+        /// <summary>Closing a file. Brief, but no new command may start during it.</summary>
         Working,
 
         Saved,
@@ -28,13 +28,18 @@ namespace FpsAiCoach
     /// <summary>
     /// Records the war-room camera to an H.264 MP4, in either of two modes.
     ///
-    /// The rolling buffer keeps the most recent seconds in memory so a moment can be saved after it
-    /// happened, which is what makes this useful as a sparring aid: you notice the mistake, then keep
-    /// the clip. The unbounded take writes continuously to disk for a whole practice session.
+    /// The rolling buffer keeps recent history available so a moment can be saved after it happened,
+    /// which is what makes this useful as a sparring aid: you notice the mistake, then keep the clip.
+    /// The take writes continuously for a whole practice session.
     ///
-    /// The two modes never run at the same time. Each drives its own encoder and its own frame
-    /// provider, and a provider re-renders the camera off-screen; running both would render and encode
-    /// every frame twice for no benefit.
+    /// Because Unity's encoder writes forward only and cannot be asked for "the last N seconds", the
+    /// rolling buffer is two segment files staggered by <c>clipSeconds</c>. Whichever segment is older
+    /// has always been running for at least that long once the first interval has passed, so finishing
+    /// it yields a clip covering *at least* the requested tail, up to twice it. Both segments share one
+    /// camera render through <see cref="ClipCameraCapture"/>, so the second costs encoding only.
+    ///
+    /// The two modes never run at the same time, since a take would otherwise encode frames that the
+    /// buffer is already encoding.
     /// </summary>
     public sealed class ClipRecorder : MonoBehaviour
     {
@@ -42,10 +47,6 @@ namespace FpsAiCoach
 
         [Tooltip("Camera whose output is encoded. Falls back to Camera.main.")]
         [SerializeField] private Camera captureCamera;
-
-        private RealtimeInstantReplaySession rolling;
-        private UnboundedRecordingSession take;
-        private string takePath;
 
         /// <summary>Raised whenever <see cref="State"/> or <see cref="StatusMessage"/> changes.</summary>
         public event Action StateChanged;
@@ -58,13 +59,25 @@ namespace FpsAiCoach
         /// <summary>Absolute path of the most recent finished file, or null before the first one.</summary>
         public string LastOutputPath { get; private set; }
 
-        /// <summary>True while muxing, when no new command may start.</summary>
+        /// <summary>True while a file is closing, when no new command may start.</summary>
         public bool IsBusy => State == ClipRecorderState.Working;
+
+#if UNITY_EDITOR
+        private ClipCameraCapture capture;
+        private readonly List<ClipMovieEncoder> segments = new();
+        private ClipMovieEncoder take;
+        private Coroutine pump;
+        private int segmentSerial;
 
         public bool IsRecordingTake => take != null;
 
-        /// <summary>The rolling buffer must be live for a clip to exist to save.</summary>
-        public bool CanSaveClip => rolling != null && !IsBusy;
+        /// <summary>A segment must exist and hold at least one frame for a clip to be savable.</summary>
+        public bool CanSaveClip => !IsBusy && OldestSegment() is { FramesWritten: > 0 };
+#else
+        public bool IsRecordingTake => false;
+
+        public bool CanSaveClip => false;
+#endif
 
         public void Configure(WarRoomTheme configuredTheme, Camera configuredCamera)
         {
@@ -76,41 +89,44 @@ namespace FpsAiCoach
 
         private void Start()
         {
+#if UNITY_EDITOR
             if (Settings.bufferOnStart)
                 StartBuffering();
             else
                 SetState(ClipRecorderState.Idle, Copy.captureStatusIdle);
+#else
+            // Unity's encoder is an editor API, so there is nothing to fall back to in a player build.
+            SetState(
+                ClipRecorderState.Failed,
+                string.Format(Copy.captureStatusUnavailable, "EDITOR ONLY"));
+#endif
         }
 
+#if UNITY_EDITOR
         /// <summary>
-        /// Covers both leaving play mode and the object being destroyed. An unbounded take holds an
-        /// open MP4, so it is given a bounded chance to close before the encoders are torn down; the
-        /// library's own guidance is that a take interrupted mid-write produces an unusable file.
-        /// The wait is capped because shutdown must not hang if the muxer cannot finish.
+        /// Covers both leaving play mode and the object being destroyed. An open MP4 is unusable until
+        /// its index is written, so every file is closed here; the take is kept because it is a
+        /// deliberate recording, while rolling segments are discarded because nobody asked for them.
         /// </summary>
         private void OnDisable()
         {
+            StopPump();
+            capture?.Flush();
+
             if (take != null)
             {
-                try
-                {
-                    take.CompleteAsync().AsTask().Wait(TimeSpan.FromSeconds(3));
-                }
-                catch (Exception exception)
-                {
-                    Debug.LogWarning($"ClipRecorder: take did not close cleanly. {Flatten(exception.Message)}");
-                }
-
-                take.Dispose();
+                take.Finish();
+                LastOutputPath = take.Path;
                 take = null;
             }
 
-            if (rolling != null)
-            {
-                // Nothing to salvage: the buffer only becomes a file through an explicit save.
-                rolling.Dispose();
-                rolling = null;
-            }
+            foreach (var segment in segments)
+                segment.Discard();
+
+            segments.Clear();
+
+            capture?.Dispose();
+            capture = null;
         }
 
         // ------------------------------------------------------------------ public actions
@@ -118,153 +134,71 @@ namespace FpsAiCoach
         /// <summary>Starts the rolling buffer. Safe to call when it is already running.</summary>
         public void StartBuffering()
         {
-            if (ArmBuffer(out var failure))
+            if (take != null || segments.Count > 0)
+                return;
+
+            if (!EnsureCapture(out var failure))
             {
-                SetState(
-                    ClipRecorderState.Buffering,
-                    string.Format(Copy.captureStatusBuffering, Settings.clipSeconds));
+                SetState(ClipRecorderState.Failed, failure);
                 return;
             }
 
-            if (failure != null)
-                SetState(ClipRecorderState.Failed, failure);
+            OpenSegment();
+            SetState(
+                ClipRecorderState.Buffering,
+                string.Format(Copy.captureStatusBuffering, Settings.clipSeconds));
         }
 
         /// <summary>
-        /// Creates the rolling session without publishing a state, so a re-arm after a failed export
-        /// cannot overwrite the message explaining that failure. Returns false with
-        /// <paramref name="failure"/> set when the session could not be created, and false with null
-        /// when there was simply nothing to do.
-        /// </summary>
-        private bool ArmBuffer(out string failure)
-        {
-            failure = null;
-
-            if (rolling != null || take != null)
-                return false;
-
-            var camera = ResolveCamera();
-            if (camera == null)
-            {
-                failure = string.Format(Copy.captureStatusUnavailable, "NO CAMERA");
-                return false;
-            }
-
-            try
-            {
-                rolling = new RealtimeInstantReplaySession(
-                    BuildOptions(),
-                    CreateFrameProvider(camera),
-                    true,
-                    CreateAudioProvider(),
-                    Settings.captureAudio,
-                    HandlePipelineException);
-                return true;
-            }
-            catch (Exception exception)
-            {
-                rolling = null;
-                Debug.LogException(exception);
-                failure = string.Format(Copy.captureStatusUnavailable, Flatten(exception.Message));
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// The camera path sees the 3D set and every world-space canvas, which covers the tactical
-        /// screen, the rails, the deck and the AI overlay boxes. It does not see screen-space overlay
-        /// canvases, so the corner brackets and the status strip stay out of the recording — which is
-        /// usually wanted, since a burned-in "RECORDING" line is noise in the saved file.
-        ///
-        /// <c>captureFullScreen</c> switches to the composited frame instead, which also catches that
-        /// overlay chrome. It reads the presented backbuffer, so unlike the camera path it captures
-        /// nothing while the editor is not drawing the Game view; prefer it only in a player build.
-        /// </summary>
-        private IFrameProvider CreateFrameProvider(Camera camera)
-        {
-            var settings = Settings;
-
-            if (settings.captureFullScreen)
-                return new ScreenshotFrameProvider();
-
-            return new CameraClipFrameProvider(
-                camera,
-                Mathf.Max(64, settings.resolution.x) & ~1,
-                Mathf.Max(64, settings.resolution.y) & ~1,
-                Mathf.Max(1, settings.frameRate));
-        }
-
-        /// <summary>
-        /// Null lets the session bind its own provider to the scene's AudioListener. The encoding
-        /// system always declares an audio track alongside the video one, so a track that never
-        /// receives a sample makes the muxer fail to close the file; feeding it the listener's output
-        /// keeps the track valid even when the war room is silent.
-        /// </summary>
-        private IAudioSampleProvider CreateAudioProvider()
-        {
-            return Settings.captureAudio ? null : NullAudioSampleProvider.Instance;
-        }
-
-        /// <summary>
-        /// Writes the buffered tail to disk. The session can export only once and stops recording when
-        /// it does, so a fresh buffer is started afterwards to keep the next moment catchable.
+        /// Finishes the oldest rolling segment and keeps it. A replacement is opened immediately so the
+        /// next moment stays catchable.
         /// </summary>
         public void SaveClip()
         {
             if (!CanSaveClip)
                 return;
 
-            _ = SaveClipAsync();
+            SetState(ClipRecorderState.Working, Copy.captureStatusSaving);
+
+            var segment = OldestSegment();
+            segments.Remove(segment);
+
+            capture.Flush();
+            segment.Finish();
+
+            var destination = BuildOutputPath("Clip");
+            var written = TryPublish(segment.Path, destination, out var failure);
+
+            OpenSegment();
+            Finish(written ? destination : null, failure);
         }
 
-        /// <summary>Starts an unbounded take, pausing the rolling buffer for its duration.</summary>
+        /// <summary>Starts a continuous take, dropping the rolling buffer for its duration.</summary>
         public void StartTake()
         {
             if (take != null || IsBusy)
                 return;
 
-            var camera = ResolveCamera();
-            if (camera == null)
+            if (!EnsureCapture(out var failure))
             {
-                SetState(
-                    ClipRecorderState.Failed,
-                    string.Format(Copy.captureStatusUnavailable, "NO CAMERA"));
+                SetState(ClipRecorderState.Failed, failure);
                 return;
             }
 
-            // The buffer is dropped rather than paused: its contents belong to the moment before the
-            // take began, and keeping it alive would double the encoding cost for frames nobody wants.
-            if (rolling != null)
-            {
-                rolling.Dispose();
-                rolling = null;
-            }
+            // The buffer is dropped rather than kept: its contents belong to the moment before the take
+            // began, and keeping it alive would double the encoding cost for frames nobody wants.
+            DiscardSegments();
 
-            try
-            {
-                takePath = BuildOutputPath("Session");
-                take = new UnboundedRecordingSession(
-                    takePath,
-                    BuildOptions(),
-                    CreateFrameProvider(camera),
-                    true,
-                    CreateAudioProvider(),
-                    Settings.captureAudio,
-                    HandlePipelineException);
-            }
-            catch (Exception exception)
-            {
-                take = null;
-                Debug.LogException(exception);
-                var message = string.Format(Copy.captureStatusFailed, Flatten(exception.Message));
-                ArmBuffer(out _);
-                SetState(ClipRecorderState.Failed, message);
-                return;
-            }
+            var settings = Settings;
+            take = new ClipMovieEncoder(
+                BuildOutputPath("Session"),
+                capture.Width,
+                capture.Height,
+                settings.frameRate);
 
             SetState(
                 ClipRecorderState.Recording,
-                string.Format(Copy.captureStatusRecording, Path.GetFileName(takePath)));
+                string.Format(Copy.captureStatusRecording, Path.GetFileName(take.Path)));
         }
 
         /// <summary>Closes the current take and resumes the rolling buffer.</summary>
@@ -273,7 +207,16 @@ namespace FpsAiCoach
             if (take == null || IsBusy)
                 return;
 
-            _ = StopTakeAsync();
+            SetState(ClipRecorderState.Working, Copy.captureStatusSaving);
+
+            var closing = take;
+            take = null;
+
+            capture.Flush();
+            var frames = closing.Finish();
+
+            OpenSegment();
+            Finish(frames > 0 ? closing.Path : null, null);
         }
 
         /// <summary>Single entry point for a toggle button.</summary>
@@ -285,90 +228,207 @@ namespace FpsAiCoach
                 StartTake();
         }
 
-        // ------------------------------------------------------------------ async work
+        // ------------------------------------------------------------------ capture pump
 
-        private async Task SaveClipAsync()
+        private bool EnsureCapture(out string failure)
         {
-            var session = rolling;
-            rolling = null;
+            failure = null;
 
-            SetState(ClipRecorderState.Working, Copy.captureStatusSaving);
+            if (capture != null)
+                return true;
 
-            string written = null;
-            string failure = null;
+            var camera = ResolveCamera();
+            if (camera == null)
+            {
+                failure = string.Format(Copy.captureStatusUnavailable, "NO CAMERA");
+                return false;
+            }
+
+            var settings = Settings;
 
             try
             {
-                written = await session.StopAndExportAsync(
-                    Settings.clipSeconds,
-                    BuildOutputPath("Clip"));
+                capture = new ClipCameraCapture(
+                    camera,
+                    settings.resolution.x,
+                    settings.resolution.y,
+                    settings.frameRate);
             }
             catch (Exception exception)
             {
+                capture = null;
                 Debug.LogException(exception);
-                failure = string.Format(Copy.captureStatusFailed, Flatten(exception.Message));
-            }
-            finally
-            {
-                session.Dispose();
+                failure = string.Format(Copy.captureStatusUnavailable, Flatten(exception.Message));
+                return false;
             }
 
-            Finish(written, failure);
-        }
-
-        private async Task StopTakeAsync()
-        {
-            var session = take;
-            take = null;
-
-            SetState(ClipRecorderState.Working, Copy.captureStatusSaving);
-
-            string failure = null;
-
-            try
-            {
-                await session.CompleteAsync();
-            }
-            catch (Exception exception)
-            {
-                Debug.LogException(exception);
-                failure = string.Format(Copy.captureStatusFailed, Flatten(exception.Message));
-            }
-            finally
-            {
-                session.Dispose();
-            }
-
-            Finish(failure == null ? takePath : null, failure);
+            capture.FrameReady += HandleFrameReady;
+            pump = StartCoroutine(Pump());
+            return true;
         }
 
         /// <summary>
-        /// Common tail for both modes: re-arm the buffer so capture continues, then publish the
-        /// outcome. The buffer is armed first and its state deliberately not published, because
-        /// re-arming must not overwrite the reason an export failed.
+        /// End of frame is used so a captured frame includes the canvas updates of the frame it belongs
+        /// to, and because it keeps running even when nothing is being presented to a display.
         /// </summary>
-        private void Finish(string written, string failure)
+        private IEnumerator Pump()
         {
-            ArmBuffer(out var armFailure);
-
-            if (failure == null && !HasContent(written))
+            while (true)
             {
-                // The muxer can report success yet leave a zero-byte file behind when no frames reached
-                // the encoder. Reporting that as "saved" would hand back a path that cannot be played.
-                failure = Copy.captureStatusNoFrames;
-                TryDelete(written);
-                written = null;
+                yield return new WaitForEndOfFrame();
+                capture?.Tick();
             }
+        }
 
-            if (failure != null)
+        private void StopPump()
+        {
+            if (pump == null)
+                return;
+
+            StopCoroutine(pump);
+            pump = null;
+        }
+
+        private void HandleFrameReady(NativeArray<byte> data, double captureTime)
+        {
+            if (take != null)
             {
-                SetState(ClipRecorderState.Failed, failure);
+                take.AddFrame(data, captureTime);
                 return;
             }
 
-            if (armFailure != null)
+            for (var i = 0; i < segments.Count; i++)
+                segments[i].AddFrame(data, captureTime);
+
+            RecycleAgedSegment(captureTime);
+        }
+
+        // ------------------------------------------------------------------ rolling segments
+
+        /// <summary>
+        /// Keeps the staggered pair going: a second segment opens once the first is <c>clipSeconds</c>
+        /// old, and from then on the older of the two is replaced every <c>clipSeconds</c>. That leaves
+        /// the survivor always holding between one and two times the requested tail.
+        /// </summary>
+        private void RecycleAgedSegment(double now)
+        {
+            var window = Mathf.Max(1, Settings.clipSeconds);
+
+            if (segments.Count == 0)
+                return;
+
+            if (segments.Count == 1)
             {
-                SetState(ClipRecorderState.Failed, armFailure);
+                if (SegmentAge(segments[0], now) >= window)
+                    OpenSegment();
+
+                return;
+            }
+
+            var oldest = OldestSegment();
+            if (SegmentAge(oldest, now) >= window * 2)
+            {
+                segments.Remove(oldest);
+                oldest.Discard();
+                OpenSegment();
+            }
+        }
+
+        private static double SegmentAge(ClipMovieEncoder segment, double now)
+        {
+            // Age is measured from the first frame actually written, not from construction, so a segment
+            // is never considered old enough on the strength of frames it does not have.
+            return double.IsNaN(segment.FirstFrameTime) ? 0.0 : now - segment.FirstFrameTime;
+        }
+
+        private ClipMovieEncoder OldestSegment()
+        {
+            ClipMovieEncoder oldest = null;
+
+            foreach (var segment in segments)
+            {
+                if (segment.FramesWritten == 0)
+                    continue;
+
+                if (oldest == null || segment.FirstFrameTime < oldest.FirstFrameTime)
+                    oldest = segment;
+            }
+
+            // Falls back to any segment so callers can still reason about an unstarted buffer.
+            return oldest ?? (segments.Count > 0 ? segments[0] : null);
+        }
+
+        private void OpenSegment()
+        {
+            var settings = Settings;
+
+            // Segments live in a scratch folder so a half-written rolling file is never mistaken for a
+            // saved clip, and are serialised so two open segments cannot collide within the same second.
+            var path = Path.Combine(
+                ResolveDirectory(),
+                "Buffer",
+                $"Segment_{DateTime.Now:yyyyMMdd_HHmmss}_{segmentSerial++}.mp4");
+
+            segments.Add(new ClipMovieEncoder(path, capture.Width, capture.Height, settings.frameRate));
+        }
+
+        private void DiscardSegments()
+        {
+            foreach (var segment in segments)
+                segment.Discard();
+
+            segments.Clear();
+        }
+
+        // ------------------------------------------------------------------ output
+
+        /// <summary>
+        /// Moves a finished segment out of the scratch folder. Reports failure rather than throwing so a
+        /// full disk surfaces on the status line instead of breaking the recorder.
+        /// </summary>
+        private static bool TryPublish(string source, string destination, out string failure)
+        {
+            failure = null;
+
+            try
+            {
+                // An empty segment is left unmoved and reported without a reason, so the caller's own
+                // empty-file check names it rather than this method guessing at the wording.
+                var info = new FileInfo(source);
+                if (!info.Exists || info.Length == 0L)
+                    return false;
+
+                Directory.CreateDirectory(Path.GetDirectoryName(destination));
+
+                if (File.Exists(destination))
+                    File.Delete(destination);
+
+                File.Move(source, destination);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                failure = Flatten(exception.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Common tail for both modes: publish the outcome, treating an empty file as a failure since
+        /// reporting it as saved would hand back a path that cannot be played.
+        /// </summary>
+        private void Finish(string written, string failure)
+        {
+            if (failure != null)
+            {
+                SetState(ClipRecorderState.Failed, string.Format(Copy.captureStatusFailed, failure));
+                return;
+            }
+
+            if (!HasContent(written))
+            {
+                SetState(ClipRecorderState.Failed, Copy.captureStatusNoFrames);
                 return;
             }
 
@@ -386,76 +446,14 @@ namespace FpsAiCoach
             var info = new FileInfo(path);
             return info.Exists && info.Length > 0L;
         }
-
-        private static void TryDelete(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-                return;
-
-            try
-            {
-                if (File.Exists(path))
-                    File.Delete(path);
-            }
-            catch (Exception exception)
-            {
-                Debug.LogWarning($"ClipRecorder: could not remove empty output. {Flatten(exception.Message)}");
-            }
-        }
+#endif
 
         // ------------------------------------------------------------------ configuration
 
-        private RealtimeEncodingOptions BuildOptions()
-        {
-            var settings = Settings;
-            var options = RealtimeEncodingOptions.Default;
-
-            options.VideoOptions = new VideoEncoderOptions
-            {
-                // H.264 wants even dimensions, so odd values authored by hand are rounded down.
-                Width = (uint)(Mathf.Max(64, settings.resolution.x) & ~1),
-                Height = (uint)(Mathf.Max(64, settings.resolution.y) & ~1),
-                FpsHint = (uint)Mathf.Max(1, settings.frameRate),
-                Bitrate = (uint)Mathf.Max(200, settings.bitrateKbps) * 1000u
-            };
-
-            // The audio track must be described with the rate and channel count Unity actually
-            // delivers. The library's defaults are 44100/2, but Unity follows the output device, which
-            // is commonly 48000. Encoding a 48 kHz stream against a 44.1 kHz track description makes
-            // the AAC encoder produce nothing, and the Windows MPEG4 sink then refuses to finalize the
-            // file because a declared track never supplied its headers.
-            options.AudioOptions = new AudioEncoderOptions
-            {
-                SampleRate = (uint)Mathf.Max(8000, AudioSettings.outputSampleRate),
-                Channels = (uint)Mathf.Max(1, ChannelCount(AudioSettings.speakerMode)),
-                Bitrate = options.AudioOptions.Bitrate
-            };
-
-            options.ForceReadback = settings.forceReadback;
-            options.FixedFrameRate = Mathf.Max(1, settings.frameRate);
-            options.MaxMemoryUsageBytesForCompressedFrames =
-                (long)Mathf.Max(8, settings.bufferMegabytes) * 1024L * 1024L;
-
-            return options;
-        }
-
-        private static int ChannelCount(AudioSpeakerMode mode)
-        {
-            switch (mode)
-            {
-                case AudioSpeakerMode.Mono: return 1;
-                case AudioSpeakerMode.Quad: return 4;
-                case AudioSpeakerMode.Surround: return 5;
-                case AudioSpeakerMode.Mode5point1: return 6;
-                case AudioSpeakerMode.Mode7point1: return 8;
-                default: return 2;
-            }
-        }
-
         /// <summary>
-        /// Clips land outside <c>Assets</c> by default so Unity never imports a multi-megabyte video
-        /// as a project asset. Point <c>outputDirectory</c> at the backend's media root when a clip
-        /// should be analyzable by the vision service straight after it is written.
+        /// Clips land outside <c>Assets</c> by default so Unity never imports a multi-megabyte video as
+        /// a project asset. Point <c>outputDirectory</c> at the backend's media root when a clip should
+        /// be analyzable by the vision service straight after it is written.
         /// </summary>
         private string ResolveDirectory()
         {
@@ -472,9 +470,7 @@ namespace FpsAiCoach
         {
             var directory = ResolveDirectory();
             Directory.CreateDirectory(directory);
-            return Path.Combine(
-                directory,
-                $"{prefix}_{DateTime.Now:yyyyMMdd_HHmmss}.mp4");
+            return Path.Combine(directory, $"{prefix}_{DateTime.Now:yyyyMMdd_HHmmss}.mp4");
         }
 
         private Camera ResolveCamera()
@@ -488,11 +484,9 @@ namespace FpsAiCoach
 
         // ------------------------------------------------------------------ helpers
 
-        private WarRoomTheme.Content Copy =>
-            theme != null ? theme.Data : FallbackCopy;
+        private WarRoomTheme.Content Copy => theme != null ? theme.Data : FallbackCopy;
 
-        private WarRoomTheme.Capture Settings =>
-            theme != null ? theme.Recording : FallbackSettings;
+        private WarRoomTheme.Capture Settings => theme != null ? theme.Recording : FallbackSettings;
 
         private static WarRoomTheme.Content fallbackCopy;
         private static WarRoomTheme.Capture fallbackSettings;
@@ -501,20 +495,9 @@ namespace FpsAiCoach
         /// Keeps the component usable when it is added by hand without a theme, so a missing asset
         /// reference surfaces as default copy rather than a null reference mid-recording.
         /// </summary>
-        private static WarRoomTheme.Content FallbackCopy =>
-            fallbackCopy ??= new WarRoomTheme.Content();
+        private static WarRoomTheme.Content FallbackCopy => fallbackCopy ??= new WarRoomTheme.Content();
 
-        private static WarRoomTheme.Capture FallbackSettings =>
-            fallbackSettings ??= new WarRoomTheme.Capture();
-
-        /// <summary>
-        /// Pipeline faults arrive from encoder threads, so this only records the message; the state
-        /// change is left to whichever command is driving, which owns the UI-facing status.
-        /// </summary>
-        private void HandlePipelineException(Exception exception)
-        {
-            Debug.LogWarning($"ClipRecorder: encoding pipeline reported {Flatten(exception.Message)}");
-        }
+        private static WarRoomTheme.Capture FallbackSettings => fallbackSettings ??= new WarRoomTheme.Capture();
 
         private void SetState(ClipRecorderState state, string message)
         {

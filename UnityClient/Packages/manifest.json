@@ -1,20 +1,9 @@
 {
-  "scopedRegistries": [
-    {
-      "name": "Unity NuGet",
-      "url": "https://unitynuget-registry.openupm.com",
-      "scopes": [
-        "org.nuget"
-      ]
-    }
-  ],
   "dependencies": {
     "com.unity.connect.share": "4.2.4",
     "com.unity.ide.visualstudio": "2.0.27",
     "com.unity.pipeline": "0.5.0-exp.1",
     "com.unity.ugui": "2.0.0",
-    "jp.co.cyberagent.instant-replay": "https://github.com/CyberAgentGameEntertainment/InstantReplay.git?path=Packages/jp.co.cyberagent.instant-replay#v1.6.8",
-    "jp.co.cyberagent.instant-replay.dependencies": "https://github.com/CyberAgentGameEntertainment/InstantReplay.git?path=/Packages/jp.co.cyberagent.instant-replay.dependencies#v1.6.8",
     "com.unity.modules.ai": "1.0.0",
     "com.unity.modules.androidjni": "1.0.0",
     "com.unity.modules.animation": "1.0.0",

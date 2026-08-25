@@ -314,8 +314,8 @@ namespace FpsAiCoach
         // ------------------------------------------------------------------ capture
 
         /// <summary>
-        /// Video capture of the war-room camera, encoded to H.264 by InstantReplay (Media Foundation
-        /// on Windows). Read by <see cref="ClipRecorder"/>.
+        /// Video capture of the war-room camera, encoded to H.264 by Unity's bundled encoder. Read by
+        /// <see cref="ClipRecorder"/>.
         /// </summary>
         [Serializable]
         public sealed class Capture
@@ -323,7 +323,11 @@ namespace FpsAiCoach
             [Tooltip("Arm the rolling buffer as soon as the scene starts, so a clip is always savable.")]
             public bool bufferOnStart = true;
 
-            [Tooltip("Length of the tail written by SAVE CLIP, in seconds.")]
+            /// <summary>
+            /// The rolling buffer is two segments staggered by this interval, so SAVE CLIP returns at
+            /// least this much history and at most twice it.
+            /// </summary>
+            [Tooltip("Shortest tail SAVE CLIP is guaranteed to cover, in seconds.")]
             public int clipSeconds = 30;
 
             /// <summary>
@@ -334,45 +338,6 @@ namespace FpsAiCoach
             public Vector2Int resolution = new Vector2Int(1920, 1080);
 
             public int frameRate = 30;
-
-            /// <summary>
-            /// Off re-renders the camera off-screen, which covers the 3D set and every world-space
-            /// canvas but not screen-space overlay chrome. On records the presented frame instead, so it
-            /// also catches the corner brackets and the status strip — but it captures nothing while the
-            /// editor is not drawing the Game view, so keep it off outside a player build.
-            /// </summary>
-            [Tooltip("Record the composited screen instead of the camera. Player builds only.")]
-            public bool captureFullScreen = false;
-
-            /// <summary>
-            /// The encoder always declares an audio track next to the video one, and a declared track
-            /// that never receives a sample makes the muxer fail to close the file. Capturing the
-            /// AudioListener keeps the track valid; the war room is near-silent, so this costs a
-            /// near-empty AAC stream rather than anything meaningful.
-            /// </summary>
-            [Tooltip("Capture the AudioListener. Disabling this can make the muxer fail to close the file.")]
-            public bool captureAudio = true;
-
-            /// <summary>
-            /// The encoder's fast path hands the GPU texture straight to the native encoder, which
-            /// requires a render-thread plugin event to be flushed. In the editor those events are not
-            /// reliably flushed for a camera rendered on demand, and the symptom is a video track that
-            /// stays empty while audio keeps filling — which then makes the muxer refuse to close the
-            /// file. Reading the frame back to the CPU first costs bandwidth but always produces frames.
-            /// </summary>
-            [Tooltip("Read frames back to the CPU instead of handing textures to the encoder directly.")]
-            public bool forceReadback = true;
-
-            [Tooltip("Target video bitrate in kbps.")]
-            public int bitrateKbps = 6000;
-
-            /// <summary>
-            /// Ceiling on buffered compressed frames, which is what actually bounds the rolling
-            /// window. At 6000 kbps, 30 s is roughly 22 MB, so this leaves headroom for the encoder to
-            /// overshoot on busy scenes rather than discarding the start of the clip.
-            /// </summary>
-            [Tooltip("Memory ceiling for the rolling buffer, in MB.")]
-            public int bufferMegabytes = 64;
 
             /// <summary>
             /// Empty means <c>persistentDataPath/Clips</c>. A relative path resolves against the Unity
@@ -580,8 +545,8 @@ namespace FpsAiCoach
             public string captureStatusFailed = "CAPTURE FAILED  ·  {0}";
             public string captureStatusUnavailable = "CAPTURE UNAVAILABLE  ·  {0}";
 
-            [Tooltip("Shown when the encoder received no frames, usually a hidden Game view in the editor.")]
-            public string captureStatusNoFrames = "NO FRAMES CAPTURED  ·  KEEP THE GAME VIEW VISIBLE";
+            [Tooltip("Shown when a file closed empty, so the recorder never reports an unplayable clip as saved.")]
+            public string captureStatusNoFrames = "NO FRAMES CAPTURED";
 
             [Header("Demo analysis (CS2 .dem via the local service)")]
             public string buttonImportDemo = "IMPORT DEMO";
