@@ -56,6 +56,9 @@ crashlytics-build.properties
 coverage.xml
 htmlcov/
 
+# Chinese design notes and runbooks, kept local on purpose
+/doc/
+
 # Local environment and secrets
 .env
 .env.*

@@ -1,13 +1,18 @@
 ---
-description: GPU 运行机 Agent 拉仓后的环境与 P0 约束
+description: GPU runtime machine setup and P0 constraints
 alwaysApply: true
 ---
 
-# GPU 运行机
+# GPU runtime machine
 
-先读仓库根目录 `AGENTS.md`，再装任何 Python 包或启动后端。
+Read `AGENTS.md` at the repo root before installing Python packages or starting
+the backend. Chinese design notes live under the untracked `doc/`.
 
-- 最终形态是单机：Unity + OBS + FastAPI + CUDA YOLO，地址保持 `127.0.0.1:8000`。
-- 第一次配环境只用 `Backend/setup-vision.ps1`，禁止先跑 `Backend/run.ps1`（会装 CPU 版 torch）。
-- 日常启动用 `Backend/run-vision.ps1`。P0 是本机 CUDA 跑通单轮录像，不要做开火检测、准心训练或跨机上传。
-- 产品决策以 `PRACTICE_REVIEW_DESIGN_ZH.md` 为准。不要提交 `.pt`、录像或 `.dem`。
+- Single machine: Unity, OBS, FastAPI and CUDA YOLO, all on `127.0.0.1:8000`.
+- First install is `Backend/setup-vision.ps1` only. Never run `Backend/run.ps1`
+  first, because it installs CPU torch.
+- Daily start is `Backend/run-vision.ps1`. P0 is one recording through local CUDA
+  inference; no shot detection, crosshair training, or cross-machine upload.
+- RTX 50 series needs `-CudaTag cu128` or newer. Setup must print
+  `OK gpu compute verified`.
+- Do not commit `.pt` weights, recordings, or `.dem` files.

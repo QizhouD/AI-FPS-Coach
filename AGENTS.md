@@ -1,114 +1,108 @@
-# Agent 入门：拉下仓库就能干活
+# Agent Onboarding
 
-给 **GPU 游戏机**（最终运行机）上的 Cursor Agent。这台机器既能打 CS2，也有 NVIDIA 显卡。整套产品在 **这一台电脑本机跑通**：Unity + OBS + FastAPI + CUDA YOLO。
+This is a single-machine product: Unity, OBS, FastAPI and CUDA YOLO all run on
+one Windows PC that both plays CS2 and has an NVIDIA GPU. Practice is only
+recorded while playing; analysis runs after recording stops, so the game and
+inference never contend for the GPU.
 
-当前这台若没有 NVIDIA GPU，只改代码、不要跑 `setup-vision.ps1`。P0 验收必须在有独显的那台完成。
+Detailed Chinese design notes and runbooks live under `doc/`, which is
+deliberately untracked. If `doc/` is missing in your clone, the setup steps below
+are still complete on their own.
 
-产品形态以 `PRACTICE_REVIEW_DESIGN_ZH.md` 为准：训练后复盘，不打实时叠加。游戏过程只录屏，分析在停录之后，因此 CS2 和推理 **不会同时抢 GPU**。
+## Read before installing anything
 
----
+1. Run `nvidia-smi` first. If it fails, install the NVIDIA driver and stop here.
+2. For a first install run **only** `.\Backend\setup-vision.ps1`. Do not run
+   `.\Backend\run.ps1` first: it installs **CPU** torch into `.venv`, which is
+   painful to undo.
+3. Do not copy `.venv` from another machine.
+4. Never commit `.pt` weights, recordings, or `.dem` files.
+5. Keep uvicorn and Unity on `127.0.0.1`. This is not a client/server split.
+6. A crosshair model is optional: `FPS_VISION_CROSSHAIR_BASELINE=true` uses the
+   screen center, which is correct for a first-person view.
 
-## 0. 先读完再动手
+## One-time setup
 
-1. 先跑 `nvidia-smi`。失败就停，去装 NVIDIA 驱动。
-2. **第一次配环境只许** `.\Backend\setup-vision.ps1`。禁止先跑 `.\Backend\run.ps1`：它会把 **CPU 版 torch** 装进 `.venv`，之后 CUDA 很难救。
-3. 不要从别的电脑拷 `.venv`。
-4. 不要把 `.pt`、录像、`.dem` 提交进 Git。
-5. 不要把 uvicorn 改成 `0.0.0.0`，不要把 Unity 的 `127.0.0.1` 改成局域网 IP。这是单机项目。
-6. 准心模型不是 P0：`FPS_VISION_CROSSHAIR_BASELINE=true` 用屏幕中心即可。
-
----
-
-## 1. 一次性环境（clone / pull 之后）
-
-前置：Windows 10/11、Python 3.10 或 3.11、Unity `6000.2.15f1`、OBS、能用的 NVIDIA 驱动。
-
-在仓库根目录：
+Requirements: Windows 10/11, Python 3.10 or 3.11, Unity `6000.2.15f1`, OBS, and a
+working NVIDIA driver.
 
 ```powershell
 nvidia-smi
 .\Backend\setup-vision.ps1
 ```
 
-若执行策略拦截脚本：
+The script creates `Backend\.venv`, installs **CUDA torch before**
+`requirements.txt`, downloads `yolov8m-csgo` into `models\`, and writes a
+gitignored `.env`.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Backend\setup-vision.ps1
-```
+It must finish with `OK gpu compute verified`. That check runs a real matmul on
+the GPU instead of trusting `torch.cuda.is_available()`, which can report success
+on a wheel that then fails at kernel launch.
 
-脚本会：建 `.venv` → **先装 CUDA 版 torch** → 再装 `requirements.txt` → 下载 `yolov8m-csgo` 到 `models\yolov8m-csgo.pt` → 写根目录 `.env`（已 gitignore）。
-
-结尾必须出现 `OK gpu compute verified`。这一步不只看 `torch.cuda.is_available()`——它会真的在 GPU 上做一次矩阵乘。只有 `is_available()=True` 不够：为旧架构编译的 wheel 能导入、能报出显卡，却在算子启动时报 `no kernel image is available`。
-
-CUDA tag 由驱动版本自动推断，也可以手动指定：
+The CUDA tag is inferred from the driver, or pass it explicitly:
 
 ```powershell
 .\Backend\setup-vision.ps1 -CudaTag cu128
 ```
 
-**RTX 50 系（Blackwell，`sm_120`）必须 cu128 或更高**，cu124 及以下装上也算不了。`check_cuda.py` 会打印 `capability` 和 wheel 的 `arch_list`，两者对不上就换 tag。
+**RTX 50 series (Blackwell, `sm_120`) needs cu128 or newer.** Older wheels
+install fine but cannot launch kernels on it. `tools/check_cuda.py` prints the
+device capability alongside the wheel's arch list so a mismatch is obvious.
 
-不要把 `ultralytics` 写进「先于 torch」的 pip 命令。
+If PowerShell blocks the script:
 
-Python 若没装，用官方安装包装 3.10/3.11 即可；venv 固定在 `Backend\.venv`。
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Backend\setup-vision.ps1
+```
 
----
-
-## 2. 日常启动
+## Daily start
 
 ```powershell
 .\Backend\run-vision.ps1
 ```
 
-监听 `http://127.0.0.1:8000`。不要关这个窗口。检查：
+Serves `http://127.0.0.1:8000`; leave the window open. Verify with:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/health
 ```
 
-`vision.cuda_available` 应为 `true`，`vision.enemy_model` 应为 `ready`。
+Expect `vision.cuda_available` true and `vision.enemy_model` `ready`.
 
-Unity：打开 `UnityClient` → `Assets/Scenes/Main.unity` → Play。接口已指向本机，不用改。
+Unity: open `UnityClient`, load `Assets/Scenes/Main.unity`, press Play. The
+endpoints already point at localhost.
 
-OBS：1080p、60fps、带音频。输出目录必须落在 `FPS_VISION_MEDIA_ROOT` 内（默认仓库 `media\`，可在 `.env` 改成 OBS 目录）。否则 `POST /api/v1/vision/video` 会 400，Unity 会退回逐帧 JPEG。
+OBS: 1080p, 60 fps, with an audio track. The output directory must sit inside
+`FPS_VISION_MEDIA_ROOT` (defaults to `media\`, changeable in `.env`). Otherwise
+`POST /api/v1/vision/video` returns 400 and Unity falls back to per-frame JPEG.
 
----
+## Current milestone (P0)
 
-## 3. 当前里程碑（P0）
+Get one practice-range recording through local CUDA inference with boxes
+aligned. Detection rate is not the goal yet.
 
-目标：单轮靶场录像在本机 CUDA 上跑完，框对齐。不是检出率，不是开火指标。
+- Video jobs no longer fail on missing opencv or missing weights
+- A `completed` job returns detections including `part=head`
+- `recommended_aim.target_id` points at the enemy head nearest screen center
+- Boxes line up with enemies on the tactical screen, and markers follow pause and
+  seek
+- Record where the CSGO model misses on CS2 footage; log it, do not swap models
+  during P0
 
-验收：
+Out of scope for P0: shot detection, pixel-to-angle conversion, job pagination,
+crosshair training, LAN split, and video upload endpoints.
 
-- 视频 job 不再因缺 opencv / 缺权重失败
-- `completed` 后结果含 `part=head`
-- `recommended_aim.target_id` 指向离屏幕中心最近的敌人头
-- 战术大屏框与敌人目视对齐；暂停 / 拖进度条标记跟随
-- 记下 CSGO 模型在 CS2 画面上的漏检（只记录，P0 不换模型）
+## Constraints when changing code
 
-P0 **不要做**：开火检测、角度换算、job 分页、准心训练、局域网拆分、视频上传接口。
-
-P0 通过后再看 `PRACTICE_REVIEW_DESIGN_ZH.md` 第 9 节 P1。
-
----
-
-## 4. 仓库里什么是权威
-
-| 文件 | 用途 |
-| --- | --- |
-| 本文件 `AGENTS.md` | 运行机 Agent 的操作说明 |
-| `PRACTICE_REVIEW_DESIGN_ZH.md` | 产品形态与实施顺序（决策优先） |
-| `VISION_NEXT_STEPS_ZH.md` | 旧视觉清单；第 3–5 节准心训练对 P0 不是必需 |
-| `Backend/setup-vision.ps1` | 一次性 CUDA 环境 |
-| `Backend/run-vision.ps1` | 日常带视觉启动 |
-| `Backend/run.ps1` | 仅 demo 分析；无 CUDA 的机器才用 |
-
----
-
-## 5. 改代码时的约束
-
-- 视觉视频接口吃 **本机路径**，且必须在 `FPS_VISION_MEDIA_ROOT` 下。不要改成跨机上传，除非产品明确要。
-- `FPS_VISION_DEVICE` 已接到 `YOLO.predict(device=...)`。有 GPU 时用 `cuda`，不要写死 `cpu`。
-- `/health` 应能看出 CUDA 和模型是否 ready，不要再改回只有 `status=ok`。
-- 敌人标签经 `normalize_label()`：`ct*`→CT、`t*`→T、含 `head`→头部。换权重时类别名要对上。
-- 起步权重：`keremberke/yolov8m-csgo-player-detection`（CSGO，需在 CS2 画面上实测）。jparedesDS 的 CS2 模型是 gated，不阻塞 P0。
+- The video endpoint takes a **local path** that must resolve inside
+  `FPS_VISION_MEDIA_ROOT`. Do not turn it into a cross-machine upload.
+- `FPS_VISION_DEVICE` reaches `YOLO.predict(device=...)`. Use `cuda` when a GPU
+  is present; do not hard-code `cpu`.
+- `/health` must keep reporting CUDA and model readiness.
+- Enemy labels pass through `normalize_label()`: `ct*` becomes CT, `t*` becomes
+  T, and any label containing `head` becomes the head part. Class names must line
+  up when swapping weights.
+- Starting weights are `keremberke/yolov8m-csgo-player-detection`, whose classes
+  (`ct / cthead / t / thead`) match `normalize_label()` as-is and load cleanly on
+  ultralytics 8.4. It is a CSGO model, so its accuracy on CS2 footage still needs
+  measuring. The jparedesDS CS2 models are gated and do not block P0.

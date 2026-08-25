@@ -131,9 +131,9 @@ Training, frame sampling, and PyTorch/ONNX comparison helpers are under
 Backend/tools. See `Backend/vision/README.md` for the full crosshair dataset
 workflow.
 
-Agent onboarding for the GPU runtime machine is `AGENTS.md`. Product order is
-`PRACTICE_REVIEW_DESIGN_ZH.md`. The older visual checklist is
-`VISION_NEXT_STEPS_ZH.md` (crosshair training is not required for P0).
+Agent onboarding for the GPU runtime machine is `AGENTS.md`. Longer Chinese
+design notes and runbooks are kept in an untracked local `doc/` folder; crosshair
+training described there is not required for P0.
 
 ## Next Analysis Milestones
 
