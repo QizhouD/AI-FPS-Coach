@@ -223,3 +223,8 @@ that must resolve inside `FPS_VISION_MEDIA_ROOT`; it is not an upload endpoint.
 
 Agent onboarding for the GPU runtime machine is `AGENTS.md`. Longer Chinese
 design notes and runbooks are kept in an untracked local `doc/` folder.
+
+`docs/` holds the rest: the original project proposal in `project-plan.md`, the
+crosshair-detector workflow in `crosshair-model-workflow.md` for if the
+screen-centre baseline ever stops being good enough, and the README's clip under
+`assets/`.

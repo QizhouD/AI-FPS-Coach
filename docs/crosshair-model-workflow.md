@@ -1,19 +1,24 @@
 # Vision Model Workflow
 
-The runtime API lives under `app/vision`. The first deployment uses the
-Ultralytics runtime so that the PyTorch and ONNX baselines can be compared
-before moving a stable model into Unity Inference Engine.
+The runtime API lives under `Backend/app/vision`. It uses the Ultralytics
+runtime so that PyTorch and ONNX baselines can be compared before a stable model
+moves into Unity Inference Engine.
+
+A crosshair detector is optional and currently out of scope: with
+`FPS_VISION_CROSSHAIR_BASELINE=true` the screen centre is used instead, which is
+correct for a first-person view. Keep this document for when the baseline stops
+being good enough.
 
 ## Environment
 
 Set these variables before starting the backend:
 
 ```powershell
-$env:FPS_VISION_ENEMY_MODEL_PATH = "D:\models\cs2-yolov10s.pt"
-$env:FPS_VISION_CROSSHAIR_MODEL_PATH = "D:\models\crosshair\weights\best.pt"
+$env:FPS_VISION_ENEMY_MODEL_PATH = "models\yolov8m-csgo.pt"
+$env:FPS_VISION_CROSSHAIR_MODEL_PATH = "models\crosshair\weights\best.pt"
 $env:FPS_VISION_CROSSHAIR_BASELINE = "true"
 $env:FPS_VISION_DEVICE = "cuda"
-$env:FPS_VISION_MEDIA_ROOT = "D:\desktop\DQZ\AI-Coach-For-FPS\media"
+$env:FPS_VISION_MEDIA_ROOT = "media"
 ```
 
 On the GPU runtime machine prefer `Backend/run-vision.ps1` from the repo root
