@@ -3,33 +3,6 @@ using System;
 namespace FpsAiCoach
 {
     [Serializable]
-    public sealed class CoachScores
-    {
-        public int aim = 68;
-        public int positioning = 72;
-        public int decision = 70;
-        public int consistency = 65;
-    }
-
-    [Serializable]
-    public sealed class CoachTip
-    {
-        public string severity = "info";
-        public string title = "Waiting for analysis";
-        public string message = "Start a video source to receive real-time coaching tips.";
-        public string action = "Confirm that OBS Virtual Camera is running.";
-    }
-
-    [Serializable]
-    public sealed class AnalysisResponse
-    {
-        public string session_id;
-        public string timestamp;
-        public CoachScores scores = new CoachScores();
-        public CoachTip tip = new CoachTip();
-    }
-
-    [Serializable]
     public sealed class DemoPlayerStats
     {
         public string name = "--";

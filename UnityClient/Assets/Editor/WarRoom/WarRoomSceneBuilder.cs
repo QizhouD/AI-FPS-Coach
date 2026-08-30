@@ -243,6 +243,10 @@ namespace FpsAiCoach.Editor
             var recorder = root.AddComponent<ClipRecorder>();
             recorder.Configure(theme, context.Camera);
 
+            // Added before the HUD so the aim metrics can be handed over as a serialized
+            // reference rather than looked up at runtime.
+            var visionOverlay = root.AddComponent<VisionInferenceOverlay>();
+
             var hud = root.AddComponent<StudioHudController>();
             hud.Configure(
                 theme,
@@ -252,7 +256,8 @@ namespace FpsAiCoach.Editor
                 context.Library,
                 context.Insights,
                 demo,
-                recorder);
+                recorder,
+                visionOverlay);
             hud.BindButtons(context.ImportButton, context.PlayButton, context.LiveButton);
             hud.BindCapture(
                 context.RecordButton,
@@ -268,11 +273,13 @@ namespace FpsAiCoach.Editor
                 context.HeaderModeLabel,
                 context.HeaderMatchLabel);
 
-            root.AddComponent<VisionInferenceOverlay>();
-
             // The marker pool and the event dots stay hidden until a real report populates them.
             if (context.ReplayMarkers != null)
                 context.ReplayMarkers.gameObject.SetActive(false);
+
+            // Nothing produces timeline events yet, and six evenly spaced dots on the track read as
+            // detected moments. TimelineController.SetEventsVisible reveals them once something does.
+            context.Timeline.SetEventsVisible(false);
         }
 
         private static void SetPrivateField(object target, string fieldName, object value)

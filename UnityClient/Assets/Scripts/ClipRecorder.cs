@@ -62,6 +62,20 @@ namespace FpsAiCoach
         /// <summary>True while a file is closing, when no new command may start.</summary>
         public bool IsBusy => State == ClipRecorderState.Working;
 
+        /// <summary>
+        /// Whether recording can run at all in this build.
+        ///
+        /// Unity's MediaEncoder is an editor-only API, so a player build has nothing to encode
+        /// with. Callers should hide the capture controls rather than present buttons that cannot
+        /// do anything. This costs the shipped app nothing: practice footage is recorded with OBS,
+        /// which is what the analysis pipeline consumes anyway.
+        /// </summary>
+#if UNITY_EDITOR
+        public const bool IsAvailable = true;
+#else
+        public const bool IsAvailable = false;
+#endif
+
 #if UNITY_EDITOR
         private ClipCameraCapture capture;
         private readonly List<ClipMovieEncoder> segments = new();

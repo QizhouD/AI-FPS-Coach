@@ -22,6 +22,9 @@ namespace FpsAiCoach
             public TMP_Text label;
         }
 
+        /// Matches MIN_REACTION_SAMPLES in the service's shot detector.
+        private const int MinReactionSamples = 3;
+
         [Header("Configuration")]
         [SerializeField] private WarRoomTheme theme;
 
@@ -33,6 +36,7 @@ namespace FpsAiCoach
         [SerializeField] private InsightsController insights;
         [SerializeField] private DemoAnalysisController demoAnalysis;
         [SerializeField] private ClipRecorder recorder;
+        [SerializeField] private VisionInferenceOverlay visionOverlay;
 
         [Header("Deck buttons")]
         [SerializeField] private DeckButton importButton = new DeckButton();
@@ -65,7 +69,8 @@ namespace FpsAiCoach
             MatchLibraryController configuredLibrary,
             InsightsController configuredInsights,
             DemoAnalysisController configuredDemoAnalysis,
-            ClipRecorder configuredRecorder)
+            ClipRecorder configuredRecorder,
+            VisionInferenceOverlay configuredVisionOverlay = null)
         {
             theme = configuredTheme;
             screen = configuredScreen;
@@ -75,6 +80,7 @@ namespace FpsAiCoach
             insights = configuredInsights;
             demoAnalysis = configuredDemoAnalysis;
             recorder = configuredRecorder;
+            visionOverlay = configuredVisionOverlay;
         }
 
         public void BindButtons(DeckButton import, DeckButton play, DeckButton live)
@@ -119,6 +125,17 @@ namespace FpsAiCoach
         /// </summary>
         private void OnEnable()
         {
+            // A scene saved before the overlay existed leaves this reference empty, and the whole
+            // aim rail then stays on its placeholder text with nothing logged. The overlay is a
+            // sibling component, so recover it rather than fail silently.
+            if (visionOverlay == null)
+            {
+                visionOverlay = GetComponent<VisionInferenceOverlay>();
+                if (visionOverlay == null)
+                    Debug.LogWarning("StudioHudController has no VisionInferenceOverlay; " +
+                                     "the aim metrics rail will not update.", this);
+            }
+
             if (importButton?.button != null)
                 importButton.button.onClick.AddListener(HandleImportClicked);
             if (playButton?.button != null)
@@ -145,6 +162,15 @@ namespace FpsAiCoach
 
             if (recorder != null)
                 recorder.StateChanged += HandleCaptureStateChanged;
+
+            if (visionOverlay != null)
+            {
+                visionOverlay.MetricsReady += HandleAimMetricsReady;
+                // A domain reload can land after a job has already finished, so replay the last
+                // result instead of leaving the rail on whatever it was showing before.
+                if (visionOverlay.LatestMetrics != null)
+                    HandleAimMetricsReady(visionOverlay.LatestMetrics);
+            }
 
             if (library != null)
             {
@@ -187,6 +213,9 @@ namespace FpsAiCoach
 
             if (recorder != null)
                 recorder.StateChanged -= HandleCaptureStateChanged;
+
+            if (visionOverlay != null)
+                visionOverlay.MetricsReady -= HandleAimMetricsReady;
 
             if (library != null)
                 library.SelectionChanged -= HandleMatchSelected;
@@ -331,6 +360,16 @@ namespace FpsAiCoach
             if (recorder == null || theme == null)
                 return;
 
+            // A player build has no encoder, so the deck drops the two controls instead of showing
+            // buttons that cannot act. OBS is the recording path outside the editor.
+            if (!ClipRecorder.IsAvailable)
+            {
+                SetVisible(recordButton, false);
+                SetVisible(saveClipButton, false);
+                SetLabel(captureStatusLabel, theme.Data.captureStatusUseObs);
+                return;
+            }
+
             SetLabel(captureStatusLabel, recorder.StatusMessage);
 
             if (captureStatusLabel != null)
@@ -381,6 +420,12 @@ namespace FpsAiCoach
 
             if (insights != null)
             {
+                // A finished practice review renames these bars, so restore the demo labels before
+                // writing demo numbers into them.
+                var authored = data.metrics;
+                for (var index = 0; index < authored.Length && index < insights.MetricCount; index++)
+                    insights.SetMetricLabel(index, authored[index].label);
+
                 // Bars are normalized against "excellent" ceilings from the theme, while the readout
                 // keeps the real figure: a K/D of 1.46 fills 73% of the bar but still prints as 1.46.
                 insights.SetMetric(
@@ -428,6 +473,129 @@ namespace FpsAiCoach
                     priority,
                     normal);
             }
+        }
+
+        // ------------------------------------------------------------------ aim analysis
+
+        /// <summary>
+        /// Moves a finished practice review onto the right rail.
+        ///
+        /// The rail is shared with the demo report rather than duplicated: only one of the two
+        /// analyses is on screen at a time, and the bars are relabelled so a deviation in degrees
+        /// is never read as a K/D.
+        /// </summary>
+        private void HandleAimMetricsReady(VisionSessionMetrics metrics)
+        {
+            if (metrics == null || theme == null || insights == null)
+                return;
+
+            var data = theme.Data;
+            var deviation = metrics.placement_deviation ?? new VisionDeviationStats();
+            var vertical = metrics.vertical_bias ?? new VisionBiasStats();
+            var tracking = metrics.effective_tracking ?? new VisionTrackingStats();
+
+            insights.SetMetricLabel(0, data.metricLabelAimDeviation);
+            insights.SetMetricLabel(1, data.metricLabelOnTarget);
+            insights.SetMetricLabel(2, data.metricLabelVerticalBias);
+
+            // Less deviation is better, so these bars fill as the error shrinks.
+            insights.SetMetric(
+                0,
+                1f - Mathf.Clamp01(
+                    deviation.mean_deg / Mathf.Max(0.01f, data.aimDeviationCeilingDeg)),
+                deviation.mean_deg.ToString("0.0"));
+
+            insights.SetMetric(
+                1,
+                tracking.on_target_ratio,
+                Mathf.RoundToInt(tracking.on_target_ratio * 100f).ToString());
+
+            insights.SetMetric(
+                2,
+                1f - Mathf.Clamp01(
+                    Mathf.Abs(vertical.mean_deg) / Mathf.Max(0.01f, data.aimBiasCeilingDeg)),
+                vertical.mean_deg.ToString("+0.0;-0.0;0.0"));
+
+            ApplyAimCards(metrics);
+        }
+
+        private void ApplyAimCards(VisionSessionMetrics metrics)
+        {
+            var data = theme.Data;
+            var priority = WarRoomColor.ForUi(theme.Colors.amberAlert);
+            var normal = WarRoomColor.ForUi(theme.Colors.blueElectric);
+            var vertical = metrics.vertical_bias ?? new VisionBiasStats();
+            var shots = metrics.shots ?? new VisionShotStats();
+
+            insights.SetCard(
+                0,
+                data.aimCardPlacementTitle,
+                metrics.headline,
+                metrics.placement_deviation != null &&
+                metrics.placement_deviation.mean_deg > data.aimDeviationCeilingDeg * 0.5f,
+                priority,
+                normal);
+
+            insights.SetCard(
+                1,
+                data.aimCardVerticalTitle,
+                DescribeVerticalBias(vertical),
+                !string.Equals(vertical.direction, "neutral", StringComparison.Ordinal),
+                priority,
+                normal);
+
+            insights.SetCard(
+                2,
+                data.aimCardShotsTitle,
+                DescribeShots(shots, data.aimCardShotsUnavailable),
+                shots.overcorrection_ratio > 0.3f,
+                priority,
+                normal);
+        }
+
+        private static string DescribeVerticalBias(VisionBiasStats vertical)
+        {
+            if (vertical.count == 0)
+                return "No head was detected, so no vertical tendency could be measured.";
+
+            switch (vertical.direction)
+            {
+                case "aims_low":
+                    return
+                        $"Crosshair sits {Mathf.Abs(vertical.mean_deg):0.0}° below head level in " +
+                        $"{vertical.positive_ratio:P0} of frames. Raise your resting height.";
+                case "aims_high":
+                    return
+                        $"Crosshair sits {Mathf.Abs(vertical.mean_deg):0.0}° above head level. " +
+                        "Lower your resting height slightly.";
+                default:
+                    return
+                        $"No systematic vertical lean; spread is {vertical.std_deg:0.0}°.";
+            }
+        }
+
+        private static string DescribeShots(VisionShotStats shots, string unavailable)
+        {
+            if (shots.detected_shots == 0)
+                return unavailable;
+
+            var text =
+                $"{shots.detected_shots} shots, {shots.aligned_shots} measured. " +
+                $"Mean deviation at the moment of firing {shots.deviation.mean_deg:0.0}°.";
+
+            // On a range map the bots never leave the screen, so the whole clip is one
+            // engagement and the "mean" is a single sample. Say so instead of quoting it.
+            if (shots.mean_reaction_seconds > 0f)
+            {
+                text += shots.reaction_samples >= MinReactionSamples
+                    ? $" Mean reaction {shots.mean_reaction_seconds * 1000f:0} ms" +
+                      $" over {shots.reaction_samples} engagements."
+                    : $" Reaction time rests on {shots.reaction_samples} engagement" +
+                      (shots.reaction_samples == 1 ? "" : "s") + " and is not an average.";
+            }
+            if (shots.overcorrection_count > 0)
+                text += $" Overcorrected before {shots.overcorrection_ratio:P0} of shots.";
+            return text;
         }
 
         private static bool IsUrgent(string severity)
@@ -557,6 +725,12 @@ namespace FpsAiCoach
             playButton.label.text = screen != null && screen.IsPlaying
                 ? theme.Data.buttonPause
                 : theme.Data.buttonPlay;
+        }
+
+        private static void SetVisible(DeckButton target, bool visible)
+        {
+            if (target?.button != null)
+                target.button.gameObject.SetActive(visible);
         }
 
         private static void SetInteractable(DeckButton target, bool interactable)

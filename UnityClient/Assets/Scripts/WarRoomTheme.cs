@@ -475,15 +475,18 @@ namespace FpsAiCoach
 
             /// <summary>
             /// Four rows, not five: the library rail also carries the import footer, and five rows
-            /// filled the canvas edge to edge. Row 0 is overwritten by each analyzed report, so it is
-            /// authored as the most recent match.
+            /// filled the canvas edge to edge. Row 0 is overwritten by each analyzed report.
+            ///
+            /// Authored as empty slots for the same reason the metric bars are: rows reading
+            /// "MIRAGE 13 : 9 TODAY" are indistinguishable from a real result, and clicking one
+            /// loads nothing, so seeded scorelines amount to a fabricated match history.
             /// </summary>
             public MatchEntry[] matches =
             {
-                new MatchEntry { map = "MIRAGE", score = "13 : 9", meta = "TODAY  ·  34 MIN" },
-                new MatchEntry { map = "INFERNO", score = "10 : 13", meta = "TODAY  ·  41 MIN" },
-                new MatchEntry { map = "ANUBIS", score = "13 : 11", meta = "YESTERDAY  ·  38 MIN" },
-                new MatchEntry { map = "NUKE", score = "7 : 13", meta = "YESTERDAY  ·  29 MIN" }
+                new MatchEntry { map = "NO MATCH", score = "--", meta = "IMPORT A DEMO" },
+                new MatchEntry { map = string.Empty, score = string.Empty, meta = string.Empty },
+                new MatchEntry { map = string.Empty, score = string.Empty, meta = string.Empty },
+                new MatchEntry { map = string.Empty, score = string.Empty, meta = string.Empty }
             };
 
             /// <summary>
@@ -501,25 +504,31 @@ namespace FpsAiCoach
                 new MetricEntry { label = "ADR", value = 0f, display = "--" }
             };
 
-            /// <summary>Three cards, because the analysis service returns exactly three insights.</summary>
+            /// <summary>
+            /// Three cards, because both the demo report and the practice review fill exactly three.
+            ///
+            /// Authored as an explicit waiting state rather than as sample coaching copy: advice
+            /// like "hold head level before the peek" is indistinguishable from a real finding, and
+            /// it would be on screen before anything had been analysed.
+            /// </summary>
             public InsightEntry[] insights =
             {
                 new InsightEntry
                 {
-                    title = "OPENING DUELS",
-                    body = "Review trade spacing on A entry",
-                    highPriority = true
-                },
-                new InsightEntry
-                {
-                    title = "FIRST SHOT",
-                    body = "Hold head level before the peek",
+                    title = "NO ANALYSIS YET",
+                    body = "Import a practice recording or a demo to see findings here.",
                     highPriority = false
                 },
                 new InsightEntry
                 {
-                    title = "ROUND IMPACT",
-                    body = "Convert damage into trades",
+                    title = string.Empty,
+                    body = string.Empty,
+                    highPriority = false
+                },
+                new InsightEntry
+                {
+                    title = string.Empty,
+                    body = string.Empty,
                     highPriority = false
                 }
             };
@@ -545,6 +554,9 @@ namespace FpsAiCoach
             public string captureStatusSaved = "SAVED  ·  {0}";
             public string captureStatusFailed = "CAPTURE FAILED  ·  {0}";
             public string captureStatusUnavailable = "CAPTURE UNAVAILABLE  ·  {0}";
+
+            [Tooltip("Shown in player builds, where Unity's editor-only encoder does not exist.")]
+            public string captureStatusUseObs = "RECORD WITH OBS  ·  THEN IMPORT THE VIDEO";
 
             [Tooltip("Shown when a file closed empty, so the recorder never reports an unplayable clip as saved.")]
             public string captureStatusNoFrames = "NO FRAMES CAPTURED";
@@ -579,6 +591,28 @@ namespace FpsAiCoach
 
             [Tooltip("ADR that fills the bar completely.")]
             public float metricAdrCeiling = 120f;
+
+            /// <summary>
+            /// Aim bars read the opposite way round to the demo bars: a smaller deviation is a
+            /// better result, so these are the values at which the bar empties rather than fills.
+            /// </summary>
+            [Header("Aim metric bars (a full bar means 'excellent')")]
+            [Tooltip("Mean crosshair deviation, in degrees, at which the bar reaches empty.")]
+            public float aimDeviationCeilingDeg = 10f;
+
+            [Tooltip("Absolute vertical bias, in degrees, at which the bar reaches empty.")]
+            public float aimBiasCeilingDeg = 6f;
+
+            public string metricLabelAimDeviation = "AIM DEV °";
+            public string metricLabelOnTarget = "ON TARGET %";
+            public string metricLabelVerticalBias = "VERT BIAS °";
+
+            [Header("Aim insight copy")]
+            public string aimCardPlacementTitle = "CROSSHAIR PLACEMENT";
+            public string aimCardVerticalTitle = "VERTICAL TENDENCY";
+            public string aimCardShotsTitle = "SHOTS FIRED";
+            public string aimCardShotsUnavailable =
+                "No shots were detected. Check that the recording has an audio track.";
 
             [Header("Demo status line")]
             public string demoStatusIdle = "NO REPORT  ·  IMPORT A DEMO";

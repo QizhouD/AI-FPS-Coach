@@ -37,10 +37,13 @@ namespace FpsAiCoach
         [SerializeField] private int textureWidth = 1920;
         [SerializeField] private int textureHeight = 1080;
 
+        // The display slab is a cube seen from behind, so its -Z face carries mirrored UVs.
+        // Both flips cancel that out; without the horizontal one the footage is mirrored while
+        // the detection overlay is not, and every box lands on the wrong side of the frame.
         [Header("Orientation")]
-        [SerializeField] private bool flipVideoHorizontally;
+        [SerializeField] private bool flipVideoHorizontally = true;
         [SerializeField] private bool flipVideoVertically = true;
-        [SerializeField] private bool flipLiveHorizontally;
+        [SerializeField] private bool flipLiveHorizontally = true;
         [SerializeField] private bool flipLiveVertically = true;
 
         private VideoPlayer videoPlayer;
