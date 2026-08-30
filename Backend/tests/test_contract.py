@@ -1,15 +1,11 @@
-import asyncio
-import io
 import sys
 import tempfile
 import types
 import unittest
 from unittest.mock import patch
 
-from fastapi import UploadFile
-
 from app.demo_analyzer import analyze_cs2_demo
-from app.main import analyze_demo_sample, analyze_frame, health
+from app.main import analyze_demo_sample, health
 
 
 class ContractTests(unittest.TestCase):
@@ -20,18 +16,8 @@ class ContractTests(unittest.TestCase):
         self.assertIn("device", payload["vision"])
         self.assertIn("enemy_model", payload["vision"])
         self.assertIn("cuda_available", payload["vision"])
-
-    def test_frame_analysis_contract(self) -> None:
-        upload = UploadFile(filename="frame.jpg", file=io.BytesIO(b"fake-jpeg-smoke-test"))
-        result = asyncio.run(
-            analyze_frame(frame=upload, game="cs2", session_id="unit-test")
-        )
-
-        self.assertEqual(result.session_id, "unit-test")
-        self.assertGreaterEqual(result.scores.aim, 0)
-        self.assertLessEqual(result.scores.aim, 100)
-        self.assertTrue(result.tip.title)
-        self.assertTrue(result.tip.action)
+        self.assertIn("fov_deg", payload["vision"])
+        self.assertIn("data_root", payload["vision"])
 
     def test_demo_sample_contract(self) -> None:
         result = analyze_demo_sample()

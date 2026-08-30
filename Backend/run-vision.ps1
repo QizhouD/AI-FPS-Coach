@@ -56,8 +56,14 @@ if (-not $env:FPS_VISION_CONFIDENCE) {
 if (-not $env:FPS_VISION_MEDIA_ROOT) {
     $env:FPS_VISION_MEDIA_ROOT = $defaultMedia
 }
+# Anchored at the repo root rather than left to default off the working
+# directory, which is Backend\ here and would scatter sessions accordingly.
+if (-not $env:FPS_VISION_DATA_ROOT) {
+    $env:FPS_VISION_DATA_ROOT = Join-Path $repoRoot "data"
+}
 
 New-Item -ItemType Directory -Force -Path $env:FPS_VISION_MEDIA_ROOT | Out-Null
+New-Item -ItemType Directory -Force -Path $env:FPS_VISION_DATA_ROOT | Out-Null
 
 if ($env:FPS_VISION_ENEMY_MODEL_PATH -and -not (Test-Path -LiteralPath $env:FPS_VISION_ENEMY_MODEL_PATH)) {
     Write-Warning "Enemy model not found: $($env:FPS_VISION_ENEMY_MODEL_PATH). Jobs will run with empty detections. Re-run setup-vision.ps1."
@@ -69,4 +75,5 @@ if ($Install) {
 
 Write-Host "device=$($env:FPS_VISION_DEVICE) model=$($env:FPS_VISION_ENEMY_MODEL_PATH)"
 Write-Host "media_root=$($env:FPS_VISION_MEDIA_ROOT)"
+Write-Host "data_root=$($env:FPS_VISION_DATA_ROOT) fov=$($env:FPS_VISION_FOV_DEG)"
 & $python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
